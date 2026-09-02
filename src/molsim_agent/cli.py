@@ -27,8 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--profile",
         choices=("full", "compact", "auto"),
-        default="full",
-        help="Model context profile; compact keeps the agent loop but exposes fewer tools",
+        default="auto",
+        help="Model context profile; auto selects compact for Ollama and full otherwise",
     )
     parser.add_argument(
         "--timeout",
