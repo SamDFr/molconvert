@@ -89,7 +89,54 @@ class OllamaBackend(LLMBackend):
                     arguments=arguments,
                 )
             )
-        return LLMResponse(content=str(message.get("content", "")), tool_calls=calls)
+        content = str(message.get("content", ""))
+        # Some small instruction-tuned models (notably qwen2.5-coder:1.5b/3b)
+        # emit a tool request as JSON text instead of Ollama's native
+        # ``message.tool_calls`` field.  Accept only the documented shape and
+        # only names present in the schemas; ordinary JSON answers remain text.
+        if not calls:
+            fallback = self._parse_text_tool_call(content, tools)
+            if fallback is not None:
+                calls = [fallback]
+                content = ""
+        return LLMResponse(content=content, tool_calls=calls)
+
+    @staticmethod
+    def _parse_text_tool_call(
+        content: str, tools: Sequence[dict[str, Any]]
+    ) -> ToolCall | None:
+        candidate = content.strip()
+        if candidate.startswith("```"):
+            lines = candidate.splitlines()
+            if len(lines) >= 3:
+                candidate = "\n".join(lines[1:-1]).strip()
+        try:
+            payload = json.loads(candidate)
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, dict) or not isinstance(payload.get("name"), str):
+            return None
+        schemas = {
+            schema.get("function", {}).get("name"): schema
+            for schema in tools
+            if isinstance(schema, dict)
+        }
+        name = payload["name"]
+        schema = schemas.get(name)
+        if schema is None:
+            return None
+        raw_arguments = payload.get("arguments", {})
+        if isinstance(raw_arguments, list):
+            properties = schema.get("function", {}).get("parameters", {}).get("properties", {})
+            keys = list(properties)
+            if len(raw_arguments) > len(keys):
+                return None
+            arguments = dict(zip(keys, raw_arguments))
+        elif isinstance(raw_arguments, dict):
+            arguments = raw_arguments
+        else:
+            return None
+        return ToolCall(id="ollama-text-call-0", name=name, arguments=arguments)
 
     @staticmethod
     def _message_to_ollama(message: Message) -> dict[str, Any]:
