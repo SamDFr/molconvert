@@ -1,0 +1,114 @@
+"""Interactive command-line interface."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from molsim_agent import Agent
+from molsim_agent.llm.ollama import OllamaBackend, OllamaError
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="molsim-agent",
+        description="An educational molecular-simulation conversion agent",
+    )
+    parser.add_argument("--workspace", default=".", help="Allowed filesystem workspace")
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("MOLSIM_AGENT_MODEL"),
+        help="Ollama model name (or set MOLSIM_AGENT_MODEL)",
+    )
+    parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
+    parser.add_argument(
+        "--profile",
+        choices=("full", "compact", "auto"),
+        default="full",
+        help="Model context profile; compact keeps the agent loop but exposes fewer tools",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=120.0,
+        help="Seconds allowed for each Ollama response",
+    )
+    parser.add_argument(
+        "--think",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable Ollama model thinking when supported",
+    )
+    parser.add_argument("--max-iterations", type=int, default=12)
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("prompt", nargs="*", help="Optional one-shot objective")
+    return parser
+
+
+class ConsoleEvents:
+    def __init__(self, verbose: bool) -> None:
+        self.verbose = verbose
+
+    def __call__(self, event: str, payload: dict[str, Any]) -> None:
+        if event == "iteration":
+            print(f"\nAgent step {payload['number']}:")
+        elif event == "tool_call":
+            print(f"tool: {payload['name']}({json.dumps(payload['arguments'], sort_keys=True)})")
+        elif event == "tool_result":
+            print("Observation:")
+            print(json.dumps(payload["observation"], indent=2, sort_keys=True))
+        elif event == "completion_blocked":
+            print(f"Runtime guard: {payload['reason']}")
+        elif self.verbose and event in {"model_request", "model_response", "limit"}:
+            print(f"[debug:{event}] {json.dumps(payload, indent=2, sort_keys=True)}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if not args.model:
+        print("Error: provide --model or set MOLSIM_AGENT_MODEL")
+        return 2
+    workspace = Path(args.workspace).resolve()
+    backend = OllamaBackend(
+        args.model,
+        base_url=args.ollama_url,
+        timeout=args.timeout,
+        think=args.think,
+    )
+    agent = Agent(
+        backend=backend,
+        model=args.model,
+        workspace=workspace,
+        max_iterations=args.max_iterations,
+        event_handler=ConsoleEvents(args.verbose),
+        profile=args.profile,
+    )
+    print("Molecular Simulation Agent")
+    print(f"Model: {args.model}")
+    print(f"Workspace: {workspace}")
+
+    prompts = [" ".join(args.prompt)] if args.prompt else None
+    try:
+        while True:
+            objective = prompts.pop() if prompts else input("\n> ").strip()
+            if not objective:
+                continue
+            if objective.lower() in {"exit", "quit", ":q"}:
+                return 0
+            state = agent.run(objective)
+            print(f"\nFinal:\n{state.final_answer}")
+            if prompts is not None:
+                return 0
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return 0
+    except OllamaError as exc:
+        print(f"\nOllama error: {exc}")
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
