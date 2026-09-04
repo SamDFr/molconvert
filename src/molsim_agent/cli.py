@@ -160,6 +160,12 @@ class ConsoleEvents:
                 print(f"Runtime guard: {payload['reason']}")
         elif event == "progress_required" and self.verbose:
             print("[debug] The model must announce its next action before the tool runs.")
+        elif event == "intent_rewrite":
+            if payload.get("status") == "rewritten":
+                print("Interpreting your request...")
+                print(f"Intent: {payload['rewritten']}")
+            else:
+                print("Interpreting your request... using deterministic fallback")
         elif self.verbose and event in {"model_request", "model_response", "limit"}:
             print(f"[debug:{event}] {json.dumps(payload, indent=2, sort_keys=True)}")
 

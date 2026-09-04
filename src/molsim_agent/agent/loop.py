@@ -122,6 +122,12 @@ class Agent:
                 rewritten = None
             if rewritten:
                 effective_objective = rewritten
+                self._emit(
+                    "intent_rewrite",
+                    {"status": "rewritten", "original": objective, "rewritten": rewritten},
+                )
+            elif not rewritten:
+                self._emit("intent_rewrite", {"status": "fallback"})
         state = AgentState(
             objective=effective_objective,
             original_objective=objective,
