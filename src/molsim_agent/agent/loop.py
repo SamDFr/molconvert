@@ -53,6 +53,7 @@ class Agent:
         skill_paths: Sequence[str | Path] | None = None,
         profile: str = "full",
         progress: bool = False,
+        progress_level: str | None = None,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be positive")
@@ -77,7 +78,9 @@ class Agent:
         self.max_iterations = max_iterations
         self.event_handler = event_handler
         self.model = model
-        self.progress = progress
+        self.progress_level = progress_level or ("brief" if progress else "off")
+        if self.progress_level not in {"off", "brief", "detailed"}:
+            raise ValueError("progress_level must be off, brief, or detailed")
 
     def _default_registry(self) -> ToolRegistry:
         registry = ToolRegistry()
@@ -305,11 +308,19 @@ class Agent:
             if next_tool is not None and "convert" in state.objective.lower()
             else "All required tools completed. Give the concise scientific report now."
         )
-        if self.progress and next_tool is not None:
+        if self.progress_level == "brief" and next_tool is not None:
             directive = (
                 f"Call {next_tool} now using the native tool interface. Before the tool call, "
                 "write exactly one brief user-facing progress sentence; do not reveal "
                 "chain-of-thought or a multi-step plan."
+            )
+        elif self.progress_level == "detailed" and next_tool is not None:
+            directive = (
+                f"Call {next_tool} now using the native tool interface. Before the tool call, "
+                "write one or two factual user-facing sentences describing what has been "
+                "observed so far (file name, format, atom count, species, cell, or validation "
+                "status when available). Use only the tool observations above; never guess, "
+                "and do not reveal chain-of-thought or a future multi-step plan."
             )
         observations = [
             {

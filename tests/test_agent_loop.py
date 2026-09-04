@@ -92,3 +92,16 @@ def test_progress_mode_requests_brief_model_status(tmp_path) -> None:
     )[0]
 
     assert "progress sentence" in message.content
+
+
+def test_detailed_progress_requests_factual_observations(tmp_path) -> None:
+    backend = MockBackend([LLMResponse(content="Done")])
+    agent = Agent(
+        backend=backend, workspace=tmp_path, profile="compact", progress_level="detailed"
+    )
+    message = agent._messages_for_model(
+        AgentState(objective="Convert POSCAR to extended XYZ as structure.xyz")
+    )[0]
+
+    assert "atom count" in message.content
+    assert "never guess" in message.content
