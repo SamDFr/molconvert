@@ -163,6 +163,16 @@ def test_dry_run_skips_conversion_write(tmp_path) -> None:
     assert "dry run" in state.final_answer.lower()
 
 
+def test_full_profile_blocks_plan_only_conversion_answer(tmp_path) -> None:
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="full")
+    state = AgentState(objective="Convert POSCAR to structure.xyz")
+
+    blocker = agent._completion_blocker(state)
+
+    assert blocker is not None
+    assert "detect_file_format" in blocker
+
+
 def test_compact_constraints_resolve_find_poscar_convert_it(tmp_path) -> None:
     (tmp_path / "POSCAR").write_text("fixture", encoding="utf-8")
     agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")

@@ -278,7 +278,7 @@ class Agent:
 
     def _completion_blocker(self, state: AgentState) -> str | None:
         successful_tools = self._successful_tool_names(state)
-        if self.profile == "compact" and "convert" in state.objective.lower():
+        if "convert" in state.objective.lower():
             required_order = (
                 "detect_file_format",
                 "inspect_structure",

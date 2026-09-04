@@ -192,6 +192,9 @@ The expected agent-selected sequence is:
 detect_file_format -> inspect_structure -> convert_structure -> validate_conversion -> final
 ```
 
+This completion requirement applies to both `compact` and `full`: a planning paragraph
+alone is not accepted as the final answer for a conversion request.
+
 It is not hard-wired to that sentence. The sequence arises from model tool calls plus the
 loaded molecular-conversion skill. For a one-shot command:
 
