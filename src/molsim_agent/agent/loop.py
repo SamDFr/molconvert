@@ -191,6 +191,19 @@ class Agent:
                     )
                 )
                 self._emit("tool_result", {"name": call.name, "observation": observation})
+                if not observation["ok"] and any(
+                    previous.call.name == call.name
+                    and previous.call.arguments == call.arguments
+                    and not previous.result.get("ok")
+                    for previous in state.tool_executions[:-1]
+                ):
+                    state.warnings.append("Stopped after a repeated failed tool call")
+                    state.final_answer = (
+                        f"I could not continue because tool {call.name!r} repeated the "
+                        "same failed request. Check the file path and workspace."
+                    )
+                    self._emit("limit", {"iterations": iteration, "reason": "repeated_failure"})
+                    return state
 
         state.warnings.append(f"Stopped after maximum of {self.max_iterations} iterations")
         state.final_answer = (
@@ -375,6 +388,17 @@ class Agent:
         objective = state.objective
         source_match = re.search(r"\bconvert\s+([^\s,]+)", objective, re.IGNORECASE)
         source = source_match.group(1).rstrip(".;") if source_match else None
+        # English requests often say “find the POSCAR and convert it”. Resolve
+        # the explicitly named standard input file from the workspace.
+        if source in {None, "it", "this", "that"}:
+            for name in ("POSCAR", "CONTCAR"):
+                if re.search(rf"\b{name}\b", objective, re.IGNORECASE):
+                    try:
+                        if self.workspace.resolve(name).is_file():
+                            source = name
+                            break
+                    except ValueError:
+                        pass
         if source is not None:
             try:
                 if not self.workspace.resolve(source).is_file():

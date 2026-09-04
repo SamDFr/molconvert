@@ -105,3 +105,16 @@ def test_detailed_progress_requests_factual_observations(tmp_path) -> None:
 
     assert "atom count" in message.content
     assert "never guess" in message.content
+
+
+def test_compact_constraints_resolve_find_poscar_convert_it(tmp_path) -> None:
+    (tmp_path / "POSCAR").write_text("fixture", encoding="utf-8")
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")
+    state = AgentState(objective="Find the POSCAR and convert it to POSCAR.xyz")
+
+    assert agent._compact_expected_arguments(state, "detect_file_format") == {"path": "POSCAR"}
+    assert agent._compact_expected_arguments(state, "convert_structure") == {
+        "source": "POSCAR",
+        "destination": "POSCAR.xyz",
+        "target_format": "xyz",
+    }
