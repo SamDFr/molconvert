@@ -100,13 +100,13 @@ def main(argv: list[str] | None = None) -> int:
         backend = MistralBackend(args.model, api_key=args.api_key, base_url=args.base_url or "https://api.mistral.ai/v1", timeout=args.timeout)
     else:
         backend = AnthropicBackend(args.model, api_key=args.api_key, base_url=args.base_url or "https://api.anthropic.com", timeout=args.timeout)
+    progress_enabled = args.progress_level not in (None, "off") or args.progress
+    progress_level = args.progress_level or ("brief" if args.progress else "off")
     agent = Agent(
         backend=backend,
         model=args.model,
         workspace=workspace,
         max_iterations=args.max_iterations,
-        progress_enabled = args.progress_level not in (None, "off") or args.progress
-        progress_level = args.progress_level or ("brief" if args.progress else "off")
         event_handler=ConsoleEvents(args.verbose, progress_enabled),
         profile=args.profile,
         progress=args.progress,
