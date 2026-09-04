@@ -79,18 +79,21 @@ class ConsoleEvents:
         self.progress = progress
         self._spinner_stop: threading.Event | None = None
         self._spinner_thread: threading.Thread | None = None
+        self._thinking_started: float | None = None
 
     def _start_thinking(self) -> None:
         if not sys.stdout.isatty() or self._spinner_thread is not None:
             return
         stop = threading.Event()
         self._spinner_stop = stop
+        self._thinking_started = time.monotonic()
 
         def animate() -> None:
             for dots in (".", "..", "..."):
                 if stop.wait(0.35):
                     return
-                print(f"\rThinking{dots}   ", end="", flush=True)
+                elapsed = time.monotonic() - (self._thinking_started or time.monotonic())
+                print(f"\rThinking{dots} ({elapsed:.0f}s)   ", end="", flush=True)
 
         self._spinner_thread = threading.Thread(target=animate, daemon=True)
         self._spinner_thread.start()
@@ -104,6 +107,7 @@ class ConsoleEvents:
             print("\r                 \r", end="", flush=True)
         self._spinner_stop = None
         self._spinner_thread = None
+        self._thinking_started = None
 
     def __call__(self, event: str, payload: dict[str, Any]) -> None:
         if event == "iteration":

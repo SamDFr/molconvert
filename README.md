@@ -220,6 +220,10 @@ as concise summaries while `--verbose` prints the complete structured result. De
 `Progress:` lines are the model's own factual recap of the observations available at that
 point.
 
+Compact inspection deliberately sends species counts and structural capabilities to the
+LLM, rather than the full coordinate and symbol arrays. The deterministic tool and
+validator still read the complete ASE structure; this is only a context-size reduction.
+
 Use `--dry-run` to let the agent inspect and plan a conversion without writing the output
 file. In interactive mode, `help` lists available CLI commands and `status` prints the
 workspace, model, and profile configuration.

@@ -29,6 +29,9 @@ def inspect_structure(
     summary = structure_summary(atoms)
     if not include_coordinates:
         summary.pop("positions_angstrom")
+        # Compact agents need counts and capabilities, not a repeated list of
+        # every symbol; the deterministic tool still retains the full structure.
+        summary.pop("chemical_symbols")
     return {
         "path": workspace.relative(source),
         "format": format_name,

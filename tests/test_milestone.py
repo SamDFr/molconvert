@@ -133,4 +133,5 @@ def test_compact_inspection_does_not_send_coordinates(tmp_path: Path) -> None:
     result = agent.registry.execute("inspect_structure", {"path": "POSCAR"})
 
     assert "positions_angstrom" not in result["structure"]
+    assert "chemical_symbols" not in result["structure"]
     assert result["structure"]["atom_count"] == 2
