@@ -54,6 +54,7 @@ class Agent:
         profile: str = "full",
         progress: bool = False,
         progress_level: str | None = None,
+        dry_run: bool = False,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be positive")
@@ -79,6 +80,7 @@ class Agent:
         self.event_handler = event_handler
         self.model = model
         self.progress_level = progress_level or ("brief" if progress else "off")
+        self.dry_run = dry_run
         if self.progress_level not in {"off", "brief", "detailed"}:
             raise ValueError("progress_level must be off, brief, or detailed")
 
@@ -103,7 +105,7 @@ class Agent:
         return registry
 
     def run(self, objective: str) -> AgentState:
-        state = AgentState(objective=objective)
+        state = AgentState(objective=objective, dry_run=self.dry_run)
         state.messages.extend(
             [Message(role="system", content=self.system_prompt), Message(role="user", content=objective)]
         )
@@ -192,7 +194,19 @@ class Agent:
                     argument_error = self._compact_argument_error(state, call)
                     if argument_error is not None:
                         raise ValueError(argument_error)
-                    result = self.registry.execute(call.name, call.arguments)
+                    workflow_error = self._workflow_error(state, call.name)
+                    if workflow_error is not None:
+                        raise ValueError(workflow_error)
+                    if self.dry_run and call.name == "convert_structure":
+                        result = {
+                            "dry_run": True,
+                            "source": call.arguments.get("source"),
+                            "destination": call.arguments.get("destination"),
+                            "target_format": call.arguments.get("target_format"),
+                            "message": "Write skipped because dry-run mode is enabled.",
+                        }
+                    else:
+                        result = self.registry.execute(call.name, call.arguments)
                     observation = {"ok": True, "result": result}
                 except Exception as exc:  # tool failures are observations, not runtime crashes
                     observation = {
@@ -215,6 +229,21 @@ class Agent:
                     )
                 )
                 self._emit("tool_result", {"name": call.name, "observation": observation})
+                if observation["ok"] and call.name in {
+                    "detect_file_format", "inspect_structure", "convert_structure", "validate_conversion"
+                }:
+                    state.phase = {
+                        "detect_file_format": "source_detected",
+                        "inspect_structure": "structure_inspected",
+                        "convert_structure": "converted" if not self.dry_run else "dry_run",
+                        "validate_conversion": "validated",
+                    }[call.name]
+                if self.dry_run and call.name == "convert_structure" and observation["ok"]:
+                    state.final_answer = (
+                        "Dry run complete: no files were written. "
+                        f"The planned output is {call.arguments.get('destination')}."
+                    )
+                    return state
                 if not observation["ok"] and any(
                     previous.call.name == call.name
                     and previous.call.arguments == call.arguments
@@ -281,6 +310,22 @@ class Agent:
             f"{pairs}. Then report its actual result."
         )
 
+    def _workflow_error(self, state: AgentState, tool_name: str) -> str | None:
+        """Keep conversion tools in a deterministic scientific order."""
+        if "convert" not in state.objective.lower():
+            return None
+        sequence = (
+            "detect_file_format",
+            "inspect_structure",
+            "convert_structure",
+            "validate_conversion",
+        )
+        successful = self._successful_tool_names(state)
+        next_tool = next((name for name in sequence if name not in successful), None)
+        if next_tool is not None and tool_name != next_tool:
+            return f"Workflow order requires {next_tool!r} before {tool_name!r}"
+        return None
+
     def _tool_schemas_for_state(self, state: AgentState) -> list[dict[str, Any]]:
         schemas = deepcopy(self.registry.schemas())
         if self.profile != "compact" or "convert" not in state.objective.lower():
@@ -319,6 +364,8 @@ class Agent:
     def _messages_for_model(self, state: AgentState) -> list[Message]:
         runtime_state = {
             "objective": state.objective,
+            "phase": state.phase,
+            "dry_run": state.dry_run,
             "iteration": state.iteration_count,
             "created_files": state.created_files,
             "modified_files": state.modified_files,

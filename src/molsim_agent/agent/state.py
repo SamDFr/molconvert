@@ -17,6 +17,8 @@ class ToolExecution:
 @dataclass(slots=True)
 class AgentState:
     objective: str
+    phase: str = "planning"
+    dry_run: bool = False
     messages: list[Message] = field(default_factory=list)
     tool_executions: list[ToolExecution] = field(default_factory=list)
     created_files: list[str] = field(default_factory=list)

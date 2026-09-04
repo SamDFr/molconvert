@@ -57,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum LLM/tool loop iterations (default: 20)",
     )
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--dry-run", action="store_true", help="Plan and inspect without writing files")
     parser.add_argument(
         "--progress",
         action="store_true",
@@ -178,17 +179,26 @@ def main(argv: list[str] | None = None) -> int:
         profile=args.profile,
         progress=args.progress,
         progress_level=progress_level,
+        dry_run=args.dry_run,
     )
     print("Molecular Simulation Agent")
     print("Hello! I’m ready to inspect, convert, and validate molecular-simulation files.")
     print(f"Model: {args.model}")
     print(f"Workspace: {workspace}")
+    if args.dry_run:
+        print("Mode: dry run (no files will be written)")
 
     prompts = [" ".join(args.prompt)] if args.prompt else None
     try:
         while True:
             objective = prompts.pop() if prompts else input("\n> ").strip()
             if not objective:
+                continue
+            if objective.lower() in {"help", ":help"}:
+                print("Commands: help, status, quit. Ask an English-language scientific file task.")
+                continue
+            if objective.lower() in {"status", ":status"}:
+                print(f"Workspace: {workspace}\nModel: {args.model}\nProfile: {args.profile}")
                 continue
             if objective.lower() in {"exit", "quit", ":q"}:
                 return 0

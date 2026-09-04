@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from molsim_agent import Agent
 from molsim_agent.agent.messages import LLMResponse, ToolCall
 from molsim_agent.agent.state import AgentState
@@ -140,6 +142,25 @@ def test_progress_mode_does_not_deadlock_on_repeated_empty_call(tmp_path) -> Non
 
     assert len(state.tool_executions) == 1
     assert state.final_answer == "The workspace was inspected."
+
+
+def test_dry_run_skips_conversion_write(tmp_path) -> None:
+    from shutil import copyfile
+    copyfile(Path(__file__).parent / "fixtures" / "POSCAR", tmp_path / "POSCAR")
+    backend = MockBackend(
+        [
+            LLMResponse(tool_calls=[ToolCall("1", "detect_file_format", {"path": "POSCAR"})]),
+            LLMResponse(tool_calls=[ToolCall("2", "inspect_structure", {"path": "POSCAR"})]),
+            LLMResponse(tool_calls=[ToolCall("3", "convert_structure", {"source": "POSCAR", "destination": "out.xyz", "target_format": "xyz"})]),
+        ]
+    )
+    state = Agent(backend=backend, workspace=tmp_path, dry_run=True).run(
+        "Convert POSCAR to out.xyz"
+    )
+
+    assert state.phase == "dry_run"
+    assert not (tmp_path / "out.xyz").exists()
+    assert "dry run" in state.final_answer.lower()
 
 
 def test_compact_constraints_resolve_find_poscar_convert_it(tmp_path) -> None:
