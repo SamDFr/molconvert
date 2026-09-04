@@ -121,8 +121,12 @@ class ConsoleEvents:
         elif event == "tool_call":
             print(f"tool: {payload['name']}({json.dumps(payload['arguments'], sort_keys=True)})")
         elif event == "tool_result":
-            print("Observation:")
-            print(json.dumps(payload["observation"], indent=2, sort_keys=True))
+            observation = payload["observation"]
+            if self.verbose:
+                print("Observation:")
+                print(json.dumps(observation, indent=2, sort_keys=True))
+            else:
+                print(f"Observation: {self._short_observation(observation)}")
         elif event == "completion_blocked":
             if self.verbose:
                 print(f"Runtime guard: {payload['reason']}")
@@ -130,6 +134,23 @@ class ConsoleEvents:
             print("[debug] The model must announce its next action before the tool runs.")
         elif self.verbose and event in {"model_request", "model_response", "limit"}:
             print(f"[debug:{event}] {json.dumps(payload, indent=2, sort_keys=True)}")
+
+    @staticmethod
+    def _short_observation(observation: dict[str, Any]) -> str:
+        if not observation.get("ok"):
+            return f"tool failed ({observation.get('error')}): {observation.get('message')}"
+        result = observation.get("result", {})
+        details: list[str] = []
+        for key in ("format", "source_format", "target_format", "atom_count", "destination"):
+            if key in result:
+                details.append(f"{key}={result[key]}")
+        structure = result.get("structure", {}) if isinstance(result, dict) else {}
+        if isinstance(structure, dict):
+            if structure.get("species_counts"):
+                details.append(f"species={structure['species_counts']}")
+            if structure.get("pbc") is not None:
+                details.append(f"pbc={structure['pbc']}")
+        return "tool completed" + (" (" + ", ".join(details) + ")" if details else "")
 
 
 def main(argv: list[str] | None = None) -> int:
