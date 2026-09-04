@@ -93,6 +93,34 @@ The important modules are:
 created/modified files, warnings, iteration count, and final answer. It is task-local;
 v0.1 intentionally has no vector database or long-term memory.
 
+## Alignment with OpenAI's agent guidance
+
+This project follows the core recommendations in OpenAI's *A practical guide to
+building agents*: start with a focused use case, keep the model/tool/instructions
+contract explicit, run the model in a bounded loop, and add guardrails around every
+action. The guide also recommends maximizing one agent before introducing multiple
+agents, which is why this repository has one orchestrator and deterministic scientific
+tools rather than a second evaluator model. See the [official OpenAI guide](https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/).
+
+| OpenAI recommendation | Implementation in this repository | Status |
+| --- | --- | --- |
+| Use an LLM to manage workflow execution | `Agent.run()` repeatedly asks the backend to choose a tool or finish | Implemented |
+| Give the model well-defined tools | `ToolSpec` contains name, description, JSON schema, callable, and safety metadata | Implemented |
+| Keep instructions explicit and reusable | Base prompts plus `skills/*/SKILL.md`, with compact/full profiles | Implemented |
+| Use a bounded run with clear exit conditions | Maximum iterations, completion checks, repeated-failure stop, and validation gates | Implemented |
+| Start with a single agent | One orchestrator; ASE and Python validators are not hidden agents | Implemented |
+| Prefer capable models, then optimize latency/cost | Ollama and API backends are interchangeable; compact mode reduces context for small models | Partially implemented |
+| Establish an evaluation baseline | 35 deterministic and mock-LLM tests cover tools and orchestration | Partially implemented: no benchmark dashboard yet |
+| Layer guardrails and tool safeguards | Workspace sandbox, typed arguments, no shell, overwrite protection, deterministic validation | Implemented for v0.1 scope |
+| Human intervention for risky or failed work | Errors and unsupported semantics are returned to the user; no automatic destructive actions | Implemented for file scope; formal approval UI is future work |
+| Add multiple agents only when complexity demands it | No specialist/evaluator LLM is used for numeric structure checks | Deliberate design choice |
+
+This is alignment with engineering principles, not a claim of production certification.
+The project does not currently provide generic prompt-injection classification,
+moderation, identity/access management, a benchmark suite, or a human approval service.
+Those controls become necessary when the agent is exposed to untrusted users, remote
+systems, or high-impact workflow changes.
+
 ### Execution profiles
 
 Profiles change the context and constraints presented to the model, not the ASE
