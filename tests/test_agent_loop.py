@@ -60,6 +60,18 @@ def test_agent_stops_at_iteration_limit(tmp_path) -> None:
     assert "maximum" in state.warnings[0]
 
 
+def test_agent_stops_after_repeated_empty_model_responses(tmp_path) -> None:
+    backend = MockBackend([LLMResponse(), LLMResponse(), LLMResponse(content="unused")])
+
+    state = Agent(backend=backend, workspace=tmp_path, max_iterations=20).run(
+        "Convert POSCAR to output.xyz"
+    )
+
+    assert state.iteration_count == 2
+    assert "returned no tool call" in state.final_answer
+    assert any("empty model responses" in warning for warning in state.warnings)
+
+
 def test_agent_loads_molecular_conversion_skill(tmp_path) -> None:
     backend = MockBackend([LLMResponse(content="Done")])
 

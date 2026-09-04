@@ -112,6 +112,7 @@ class Agent:
         state.messages.extend(
             [Message(role="system", content=self.system_prompt), Message(role="user", content=objective)]
         )
+        empty_model_responses = 0
 
         for iteration in range(1, self.max_iterations + 1):
             state.iteration_count = iteration
@@ -149,6 +150,26 @@ class Agent:
                 role="assistant", content=response.content, tool_calls=response.tool_calls
             )
             state.messages.append(assistant)
+
+            if not response.tool_calls and not response.content.strip():
+                empty_model_responses += 1
+                if empty_model_responses >= 2:
+                    state.warnings.append(
+                        "Stopped after repeated empty model responses; the provider did not "
+                        "return a tool call or a final answer."
+                    )
+                    state.final_answer = (
+                        "I could not continue because the model returned no tool call or "
+                        "answer twice in a row. Try --no-think, a stronger tool-calling "
+                        "model, or a larger timeout."
+                    )
+                    self._emit(
+                        "limit",
+                        {"iterations": iteration, "reason": "repeated_empty_response"},
+                    )
+                    return state
+            elif response.tool_calls or response.content.strip():
+                empty_model_responses = 0
 
             if (
                 self.progress_level != "off"
