@@ -373,29 +373,16 @@ class Agent:
         self, state: AgentState, tool_name: str
     ) -> dict[str, Any]:
         objective = state.objective
-        # Prefer explicit, existing simulation filenames mentioned in the goal.
-        # This also handles French phrasing such as “convertie le POSCAR en ...”.
-        source = None
-        for match in re.finditer(r"\b(?:POSCAR|CONTCAR)\b", objective, re.IGNORECASE):
-            candidate_name = match.group(0)
+        source_match = re.search(r"\bconvert\s+([^\s,]+)", objective, re.IGNORECASE)
+        source = source_match.group(1).rstrip(".;") if source_match else None
+        if source is not None:
             try:
-                candidate = self.workspace.resolve(candidate_name)
-            except ValueError:
-                continue
-            if candidate.is_file():
-                source = candidate_name
-                break
-        if source is None:
-            source_match = re.search(r"\bconvert\w*\s+([^\s,]+)", objective, re.IGNORECASE)
-            source = source_match.group(1).rstrip(".;") if source_match else None
-            if source is not None:
-                try:
-                    if not self.workspace.resolve(source).is_file():
-                        source = None
-                except ValueError:
+                if not self.workspace.resolve(source).is_file():
                     source = None
+            except ValueError:
+                source = None
         destination_match = re.search(
-            r"\b(?:as|en|vers|to)\s+([A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data))",
+            r"\b(?:as|to)\s+([A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data))",
             objective,
             re.IGNORECASE,
         )
