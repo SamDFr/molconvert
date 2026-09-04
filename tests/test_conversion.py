@@ -30,6 +30,8 @@ def test_poscar_to_extended_xyz_preserves_required_structure(workspace: Workspac
     assert report["positions"]["status"] == "preserved"
     assert report["cell"]["status"] == "preserved"
     assert report["pbc"] == "preserved"
+    assert report["classification"] == "exact"
+    assert report["information_lost_or_changed"] == []
 
 
 def test_poscar_to_lammps_data_preserves_basic_structure(workspace: Workspace) -> None:
@@ -42,6 +44,8 @@ def test_poscar_to_lammps_data_preserves_basic_structure(workspace: Workspace) -
     assert report["cell"]["status"] == "preserved"
     assert report["pbc"] == "not_encoded"
     assert report["required_structure_properties_preserved"] is False
+    assert report["classification"] == "lossy"
+    assert "pbc" in report["information_lost_or_changed"]
 
 
 def test_poscar_to_cif_preserves_basic_structure(workspace: Workspace) -> None:
@@ -51,6 +55,7 @@ def test_poscar_to_cif_preserves_basic_structure(workspace: Workspace) -> None:
     assert result["target_format"] == "cif"
     assert report["atom_count"] == "preserved"
     assert report["species"] == "preserved"
+    assert report["classification"] == "exact"
 
 
 def test_xyz_to_ase_traj(workspace: Workspace) -> None:

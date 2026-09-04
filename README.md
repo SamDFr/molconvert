@@ -30,6 +30,17 @@ For example, extXYZ can preserve a POSCAR's cell and PBC, while plain XYZ cannot
 LAMMPS data file does not encode the input script's boundary command, so validation
 reports its PBC status as `not_encoded` even if ASE's in-memory default happens to match.
 
+### Why there is no second evaluator LLM
+
+For structure conversion, the scientific evaluator is deterministic Python/ASE code,
+not another language-model agent. `validate_conversion` compares the source and output
+using explicit tolerances and returns a machine-readable `classification`:
+`exact`, `lossy`, or `changed`, plus `information_lost_or_changed`. This is reproducible,
+fast, and cannot hallucinate an atom count or cell. The orchestrating LLM only interprets
+that report for the user. A separate evaluator becomes useful later for semantic tasks
+(for example reviewing a proposed VASP-to-LAMMPS workflow), where the criteria are not
+fully numeric and a human approval step is required.
+
 ## What is an agent?
 
 A chat model produces text. An agent adds a runtime that repeatedly gives the model an

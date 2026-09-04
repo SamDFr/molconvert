@@ -70,6 +70,27 @@ def validate_conversion(
             pbc == "preserved",
         )
     )
+    losses = [
+        name
+        for name, result in optional.items()
+        if (result if isinstance(result, str) else result["status"])
+        in {"lost", "changed"}
+    ]
+    if cell["status"] != "preserved":
+        losses.append("cell")
+    if pbc != "preserved":
+        losses.append("pbc")
+    core_changed = (
+        atom_count != "preserved"
+        or species != "preserved"
+        or positions["status"] != "preserved"
+    )
+    if core_changed:
+        classification = "changed"
+    elif losses:
+        classification = "lossy"
+    else:
+        classification = "exact"
     return {
         "source": workspace.relative(source_path),
         "destination": workspace.relative(destination_path),
@@ -83,6 +104,8 @@ def validate_conversion(
         "pbc": pbc,
         **optional,
         "required_structure_properties_preserved": required_ok,
+        "classification": classification,
+        "information_lost_or_changed": sorted(set(losses)),
         "warnings": warnings,
     }
 
