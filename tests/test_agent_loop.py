@@ -108,6 +108,22 @@ def test_auto_profile_uses_compact_context_for_ollama(tmp_path) -> None:
     assert "Compact Molecular Conversion" in agent.system_prompt
 
 
+def test_llm_intent_mode_rewrites_before_agent_loop(tmp_path) -> None:
+    from molsim_agent.agent.intent import rewrite_objective
+
+    backend = MockBackend(
+        [
+            LLMResponse(
+                content='{"source":"POSCAR","destination":"POSCAR.data",'
+                '"target_format":"lammps-data","validate":true}'
+            )
+        ]
+    )
+    assert rewrite_objective(backend, "make the POSCAR into a LAMMPS input geometry file") == (
+        "Convert POSCAR to POSCAR.data, then validate the conversion"
+    )
+
+
 def test_progress_mode_requests_brief_model_status(tmp_path) -> None:
     backend = MockBackend([LLMResponse(content="Done")])
     agent = Agent(backend=backend, workspace=tmp_path, profile="compact", progress=True)

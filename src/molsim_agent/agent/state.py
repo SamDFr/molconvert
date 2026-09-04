@@ -17,6 +17,7 @@ class ToolExecution:
 @dataclass(slots=True)
 class AgentState:
     objective: str
+    original_objective: str | None = None
     phase: str = "planning"
     dry_run: bool = False
     messages: list[Message] = field(default_factory=list)

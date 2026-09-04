@@ -146,6 +146,16 @@ the user omits an output filename, it derives a safe name such as `POSCAR.data` 
 LAMMPS data file or `POSCAR.xyz` for XYZ. Scientific choices—units, potentials, boundary
 semantics, and workflow mappings—are never inferred.
 
+### Intent normalization modes
+
+The default `--intent-mode deterministic` uses local rules and adds no model request. It
+is the recommended mode for small or slow local models. `--intent-mode llm` performs one
+additional, tightly constrained LLM call before the agent loop and asks for a JSON intent
+(`source`, `destination`, `target_format`, `validate`). The result is accepted only when
+it contains a supported format and concrete source; otherwise the normal deterministic
+interpretation remains in control. This optional call improves tolerance of natural
+phrasing, but costs latency and does not authorize scientific mappings or bypass safety.
+
 ## Agent loop
 
 The readable implementation is in

@@ -40,6 +40,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Model context profile; auto selects compact for Ollama and full otherwise",
     )
     parser.add_argument(
+        "--intent-mode",
+        choices=("deterministic", "llm"),
+        default="deterministic",
+        help="Normalize free-form requests deterministically (default) or with one extra LLM call",
+    )
+    parser.add_argument(
         "--timeout",
         type=float,
         default=120.0,
@@ -201,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         progress=args.progress,
         progress_level=progress_level,
         dry_run=args.dry_run,
+        intent_mode=args.intent_mode,
     )
     print("Molecular Simulation Agent")
     print("Hello! I’m ready to inspect, convert, and validate molecular-simulation files.")

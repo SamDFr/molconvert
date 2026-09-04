@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from molsim_agent.agent.messages import Message, ToolCall
+from molsim_agent.agent.intent import rewrite_objective
 from molsim_agent.agent.planner import build_system_prompt
 from molsim_agent.agent.state import AgentState, ToolExecution
 from molsim_agent.llm.base import LLMBackend
@@ -38,6 +39,7 @@ requested format is absent from the tool schema, say that it is not implemented 
 never guess or substitute another format."""
 
 PROFILES = ("full", "compact", "auto")
+INTENT_MODES = ("deterministic", "llm")
 
 
 class Agent:
@@ -58,6 +60,7 @@ class Agent:
         progress: bool = False,
         progress_level: str | None = None,
         dry_run: bool = False,
+        intent_mode: str = "deterministic",
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be positive")
@@ -70,6 +73,8 @@ class Agent:
         self.backend = backend
         if profile not in PROFILES:
             raise ValueError(f"profile must be one of: {', '.join(PROFILES)}")
+        if intent_mode not in INTENT_MODES:
+            raise ValueError(f"intent_mode must be one of: {', '.join(INTENT_MODES)}")
         self.profile = self._resolve_profile(profile, backend)
         self.workspace = Workspace.from_path(workspace)
         self.registry = registry or self._default_registry()
@@ -84,6 +89,7 @@ class Agent:
         self.model = model
         self.progress_level = progress_level or ("brief" if progress else "off")
         self.dry_run = dry_run
+        self.intent_mode = intent_mode
         if self.progress_level not in {"off", "brief", "detailed"}:
             raise ValueError("progress_level must be off, brief, or detailed")
 
@@ -108,7 +114,19 @@ class Agent:
         return registry
 
     def run(self, objective: str) -> AgentState:
-        state = AgentState(objective=objective, dry_run=self.dry_run)
+        effective_objective = objective
+        if self.intent_mode == "llm":
+            try:
+                rewritten = rewrite_objective(self.backend, objective)
+            except Exception:
+                rewritten = None
+            if rewritten:
+                effective_objective = rewritten
+        state = AgentState(
+            objective=effective_objective,
+            original_objective=objective,
+            dry_run=self.dry_run,
+        )
         state.messages.extend(
             [Message(role="system", content=self.system_prompt), Message(role="user", content=objective)]
         )
