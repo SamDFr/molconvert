@@ -52,6 +52,7 @@ class Agent:
         model: str | None = None,
         skill_paths: Sequence[str | Path] | None = None,
         profile: str = "full",
+        progress: bool = False,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be positive")
@@ -76,6 +77,7 @@ class Agent:
         self.max_iterations = max_iterations
         self.event_handler = event_handler
         self.model = model
+        self.progress = progress
 
     def _default_registry(self) -> ToolRegistry:
         registry = ToolRegistry()
@@ -303,6 +305,12 @@ class Agent:
             if next_tool is not None and "convert" in state.objective.lower()
             else "All required tools completed. Give the concise scientific report now."
         )
+        if self.progress and next_tool is not None:
+            directive = (
+                f"Call {next_tool} now using the native tool interface. Before the tool call, "
+                "write exactly one brief user-facing progress sentence; do not reveal "
+                "chain-of-thought or a multi-step plan."
+            )
         observations = [
             {
                 "tool": execution.call.name,

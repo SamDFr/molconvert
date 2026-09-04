@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from molsim_agent import Agent
 from molsim_agent.agent.messages import LLMResponse, ToolCall
+from molsim_agent.agent.state import AgentState
 from molsim_agent.llm.mock import MockBackend
 from molsim_agent.llm.ollama import OllamaBackend
 
@@ -80,3 +81,14 @@ def test_auto_profile_uses_compact_context_for_ollama(tmp_path) -> None:
         "validate_conversion",
     }
     assert "Compact Molecular Conversion" in agent.system_prompt
+
+
+def test_progress_mode_requests_brief_model_status(tmp_path) -> None:
+    backend = MockBackend([LLMResponse(content="Done")])
+    agent = Agent(backend=backend, workspace=tmp_path, profile="compact", progress=True)
+
+    message = agent._messages_for_model(
+        AgentState(objective="Convert POSCAR to extended XYZ as structure.xyz")
+    )[0]
+
+    assert "progress sentence" in message.content
