@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from molsim_agent.formats.detection import detect_format
+from molsim_agent.formats.detection import SUPPORTED_FORMATS, detect_format
 from molsim_agent.formats.structures import read_structure, structure_summary
 from molsim_agent.safety.policies import Workspace
 from molsim_agent.tools.registry import ToolSpec
@@ -17,6 +17,7 @@ def detect_file_format(workspace: Workspace, path: str) -> dict[str, object]:
         "path": workspace.relative(source),
         "format": format_name,
         "supported": format_name is not None,
+        "implemented_formats": list(SUPPORTED_FORMATS),
         "warnings": warnings,
     }
 
@@ -52,7 +53,7 @@ def inspection_tool_specs(
     return [
         ToolSpec(
             "detect_file_format",
-            "Detect whether a file is a supported VASP, XYZ/extXYZ, CIF, ASE traj, or LAMMPS data file.",
+            "Detect a structure format. If it is not implemented by this project, report that clearly; do not substitute another format.",
             path_parameter,
             lambda path: detect_file_format(workspace, path),
             {"filesystem": "read", "workspace_only": True},

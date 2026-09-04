@@ -26,13 +26,16 @@ Use deterministic tools for all file inspection and conversion. Never invent sci
 data. Call tools when evidence is needed. Report preservation, loss, warnings, and
 assumptions. Finish with a concise answer only after required validation is complete.
 All paths are relative to the constrained workspace. Explain decisions and evidence
-briefly, but do not reveal private chain-of-thought."""
+briefly, but do not reveal private chain-of-thought. If a requested format is not in the
+implemented tool schema, say that it is not implemented here; never substitute a format."""
 
 COMPACT_SYSTEM_PROMPT = """You are a molecular structure conversion agent.
 Use the provided tools for evidence and all file operations. ASE—not you—handles atomic
 data. Never invent scientific information. Validate every converted output before giving
 a concise final report. Call the one available tool instead of describing a future plan.
-Extended XYZ always means the tool argument target_format="extxyz", never "xyz"."""
+Extended XYZ always means the tool argument target_format="extxyz", never "xyz". If a
+requested format is absent from the tool schema, say that it is not implemented here;
+never guess or substitute another format."""
 
 PROFILES = ("full", "compact", "auto")
 
@@ -429,7 +432,8 @@ class Agent:
             f"Objective: {state.objective}\n"
             f"Tool observations: {json.dumps(observations, sort_keys=True)}\n"
             "Rules: tools and ASE handle atomic data; never invent data; never overwrite; "
-            "extended XYZ means target_format='extxyz'.\n"
+            "extended XYZ means target_format='extxyz'; unsupported requested formats must "
+            "be reported as not implemented.\n"
             f"Current action: {directive}"
         )
         if next_tool is not None:

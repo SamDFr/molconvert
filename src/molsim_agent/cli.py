@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import os
 import sys
@@ -89,7 +90,7 @@ class ConsoleEvents:
         self._thinking_started = time.monotonic()
 
         def animate() -> None:
-            for dots in (".", "..", "..."):
+            for dots in itertools.cycle((".", "..", "...")):
                 if stop.wait(0.35):
                     return
                 elapsed = time.monotonic() - (self._thinking_started or time.monotonic())

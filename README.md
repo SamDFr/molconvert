@@ -8,6 +8,10 @@ LangGraph, CrewAI, AutoGen, or other agent framework hiding it.
 
 Version 0.1 focuses on structures in VASP POSCAR/CONTCAR, XYZ/extXYZ, CIF, ASE `.traj`,
 and LAMMPS data formats. It does not pretend that simulation input decks are interchangeable.
+ASE supports many additional readers and writers; they are intentionally not exposed until
+each one has a project-specific safety policy and validation coverage. A request for one of
+those formats is reported as “not implemented here”, rather than silently delegated to an
+unvalidated ASE writer.
 
 ## Conversion semantics
 
