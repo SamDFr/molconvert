@@ -410,10 +410,10 @@ class Agent:
         elif self.progress_level == "detailed" and next_tool is not None:
             directive = (
                 f"Call {next_tool} now using the native tool interface. Before the tool call, "
-                "write one or two factual user-facing sentences describing what has been "
-                "observed so far (file name, format, atom count, species, cell, or validation "
-                "status when available). Use only the tool observations above; never guess, "
-                "and do not reveal chain-of-thought or a future multi-step plan."
+                "write exactly one concise scientific sentence (maximum 25 words) stating "
+                "only observed facts and the next action; mention file, format, atom count, "
+                "species, cell, or validation status only when available. No speculation, "
+                "general explanations, or chain-of-thought."
             )
         observations = [
             {

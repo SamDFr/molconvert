@@ -106,7 +106,7 @@ def test_detailed_progress_requests_factual_observations(tmp_path) -> None:
     )[0]
 
     assert "atom count" in message.content
-    assert "never guess" in message.content
+    assert "No speculation" in message.content
 
 
 def test_progress_mode_requires_model_announcement_before_tool(tmp_path) -> None:
