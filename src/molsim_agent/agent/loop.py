@@ -461,7 +461,7 @@ class Agent:
         source = source_match.group(1).rstrip(".;") if source_match else None
         # English requests often say “find the POSCAR and convert it”. Resolve
         # the explicitly named standard input file from the workspace.
-        if source in {None, "it", "this", "that"}:
+        if source in {None, "the", "it", "this", "that"}:
             for name in ("POSCAR", "CONTCAR"):
                 if re.search(rf"\b{name}\b", objective, re.IGNORECASE):
                     try:
