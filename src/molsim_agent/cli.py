@@ -164,6 +164,9 @@ class ConsoleEvents:
             if payload.get("status") == "rewritten":
                 print("Interpreting your request...")
                 print(f"Intent: {payload['rewritten']}")
+            elif payload.get("status") == "deterministic":
+                print("Interpreting your request... (deterministic)")
+                print(f"Intent: {json.dumps(payload['intent'], sort_keys=True)}")
             else:
                 print("Interpreting your request... using deterministic fallback")
         elif self.verbose and event in {"model_request", "model_response", "limit"}:

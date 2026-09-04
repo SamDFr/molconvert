@@ -133,6 +133,13 @@ class Agent:
             original_objective=objective,
             dry_run=self.dry_run,
         )
+        if self.intent_mode == "deterministic":
+            intent = (
+                self._compact_expected_arguments(state, "convert_structure")
+                if self.profile == "compact" and self._is_conversion_objective(objective)
+                else {"objective": objective}
+            )
+            self._emit("intent_rewrite", {"status": "deterministic", "intent": intent})
         state.messages.extend(
             [Message(role="system", content=self.system_prompt), Message(role="user", content=objective)]
         )
