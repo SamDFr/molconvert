@@ -5,7 +5,9 @@ describe a future plan or print a tool call as text. When asked for extended XYZ
 `target_format="extxyz"`.
 
 Supported structure targets include VASP, plain XYZ, extended XYZ, CIF, ASE traj, and
-LAMMPS data. Use an explicit destination filename when the user requests a conversion.
+LAMMPS data. Prefer an explicit destination filename; if it is omitted, use the
+runtime-provided safe derived filename (for example `POSCAR.data`) rather than inventing
+scientific content.
 
 Never invent coordinates, units, parameters, or mappings. Never overwrite unless the
 user explicitly requested it. Use `extxyz`, not plain `xyz`, when cell and PBC must be

@@ -320,7 +320,7 @@ class Agent:
 
     def _completion_blocker(self, state: AgentState) -> str | None:
         successful_tools = self._successful_tool_names(state)
-        if "convert" in state.objective.lower():
+        if self._is_conversion_objective(state.objective):
             required_order = (
                 "detect_file_format",
                 "inspect_structure",
@@ -355,7 +355,7 @@ class Agent:
 
     def _workflow_error(self, state: AgentState, tool_name: str) -> str | None:
         """Keep conversion tools in a deterministic scientific order."""
-        if "convert" not in state.objective.lower():
+        if not self._is_conversion_objective(state.objective):
             return None
         sequence = (
             "detect_file_format",
@@ -376,7 +376,7 @@ class Agent:
 
     def _tool_schemas_for_state(self, state: AgentState) -> list[dict[str, Any]]:
         schemas = deepcopy(self.registry.schemas())
-        if self.profile != "compact" or "convert" not in state.objective.lower():
+        if self.profile != "compact" or not self._is_conversion_objective(state.objective):
             return schemas
         successful_tools = self._successful_tool_names(state)
         sequence = (
@@ -437,7 +437,7 @@ class Agent:
         directive = (
             f"Call {next_tool} now using the native tool interface. Do not write a plan or "
             "describe the call in text."
-            if next_tool is not None and "convert" in state.objective.lower()
+            if next_tool is not None and self._is_conversion_objective(state.objective)
             else "All required tools completed. Give the concise scientific report now."
         )
         if self.progress_level == "brief" and next_tool is not None:
@@ -475,6 +475,12 @@ class Agent:
             "be reported as not implemented.\n"
             f"Current action: {directive}"
         )
+        intent = self._compact_expected_arguments(state, "convert_structure")
+        if intent:
+            compact_context += (
+                "\nInterpreted conversion intent (runtime-normalized; use these values): "
+                f"{json.dumps(intent, sort_keys=True)}"
+            )
         if next_tool is not None:
             expected = self._compact_expected_arguments(state, next_tool)
             if expected:
@@ -483,6 +489,18 @@ class Agent:
                     f"{json.dumps(expected, sort_keys=True)}"
                 )
         return [Message(role="user", content=compact_context)]
+
+    @staticmethod
+    def _is_conversion_objective(objective: str) -> bool:
+        """Recognize common conversion verbs without making the LLM parse the task alone."""
+        return bool(re.search(r"\bconvert\b", objective, re.IGNORECASE)) or bool(
+            re.search(
+                r"\b(?:convert|transform|export|write|save|turn|change)\b.*"
+                r"\b(?:to|into|as)\b",
+                objective,
+                re.IGNORECASE | re.DOTALL,
+            )
+        )
 
     def _compact_argument_error(
         self, state: AgentState, call: ToolCall
@@ -507,8 +525,14 @@ class Agent:
     ) -> dict[str, Any]:
         objective = state.objective
         source_match = re.search(
-            r"\bconvert\s+(?:the\s+)?([^\s,]+)", objective, re.IGNORECASE
+            r"\b(?:convert|transform|export|write|save|turn|change)\s+(?:the\s+)?([^\s,]+)",
+            objective,
+            re.IGNORECASE,
         )
+        if source_match is None:
+            source_match = re.search(
+                r"\bfrom\s+([^\s,]+)", objective, re.IGNORECASE
+            )
         source = source_match.group(1).rstrip(".;") if source_match else None
         # English requests often say “find the POSCAR and convert it”. Resolve
         # the explicitly named standard input file from the workspace.
@@ -550,14 +574,36 @@ class Agent:
                 expected["target_format"] = "extxyz"
             elif destination and destination.lower().endswith(".xyz"):
                 expected["target_format"] = "xyz"
-            elif "lammps" in lowered:
+            elif re.search(r"\blammps\b", lowered):
                 expected["target_format"] = "lammps-data"
             elif destination and destination.lower().endswith(".data"):
                 expected["target_format"] = "lammps-data"
             elif destination and destination.lower().endswith(".cif"):
                 expected["target_format"] = "cif"
-            elif "ase traj" in lowered or ".traj" in lowered:
+            elif re.search(r"\b(?:ase\s+traj|trajectory|traj)\b", lowered) or (
+                destination and destination.lower().endswith(".traj")
+            ):
                 expected["target_format"] = "traj"
+            elif re.search(r"\b(?:xyz|xyz file|xyz format)\b", lowered):
+                expected["target_format"] = "xyz"
+            elif re.search(r"\b(?:cif|crystallographic information file)\b", lowered):
+                expected["target_format"] = "cif"
+            if source and "target_format" in expected and not destination:
+                # A filename is a safe, non-scientific default.  This keeps ordinary
+                # requests such as "convert POSCAR to LAMMPS data" usable while
+                # still leaving scientific mappings to the user.
+                suffixes = {
+                    "xyz": ".xyz",
+                    "extxyz": ".extxyz",
+                    "traj": ".traj",
+                    "lammps-data": ".data",
+                    "cif": ".cif",
+                    "vasp": ".vasp",
+                }
+                source_path = Path(source)
+                expected["destination"] = str(
+                    source_path.with_name(source_path.name + suffixes[expected["target_format"]])
+                )
             return expected
         if tool_name == "validate_conversion":
             for execution in reversed(state.tool_executions):

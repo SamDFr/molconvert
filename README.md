@@ -141,6 +141,11 @@ reliability on resource-constrained hardware. Full mode remains available unchan
 larger local models and remote backends. Both profiles use the same agent loop, tool
 registry, workspace sandbox, conversion functions, and validation guard.
 
+Compact mode also normalizes common everyday wording. If a supported target is named but
+the user omits an output filename, it derives a safe name such as `POSCAR.data` for a
+LAMMPS data file or `POSCAR.xyz` for XYZ. Scientific choices—units, potentials, boundary
+semantics, and workflow mappings—are never inferred.
+
 ## Agent loop
 
 The readable implementation is in
