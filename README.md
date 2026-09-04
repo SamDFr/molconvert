@@ -224,7 +224,9 @@ models that return empty content will produce no progress line.
 When progress is enabled, the runtime requires a model-generated announcement before a
 native tool call is executed. If the model returns only a tool call with no text, it is
 asked again to say what it found and what it will do next. This may add an LLM turn, but
-it prevents the runtime from inventing a canned announcement.
+it prevents the runtime from inventing a canned announcement. If a small model still
+returns an empty announcement on the retry, the original tool call is allowed so the
+workflow cannot deadlock.
 
 On a small Intel Mac, use:
 

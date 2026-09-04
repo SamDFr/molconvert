@@ -149,6 +149,13 @@ class Agent:
                 self.progress_level != "off"
                 and response.tool_calls
                 and not response.content.strip()
+                and not any(
+                    message.role == "assistant"
+                    and not message.content.strip()
+                    and message.tool_calls
+                    and message.tool_calls[0].name == response.tool_calls[0].name
+                    for message in state.messages[:-1]
+                )
             ):
                 # In progress mode, require the model to announce its next action
                 # in its own words before executing a tool. This avoids fabricating
