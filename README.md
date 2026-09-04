@@ -151,8 +151,10 @@ may select nonexistent tools, omit required arguments, or stop too early; the re
 and scientific validators remain authoritative even when model planning is imperfect.
 
 The compact intent router is intentionally English-only, not a general multilingual
-parser. Use common English wording with explicit filenames and formats. Other languages
-or unusual phrasing may require an explicit English reformulation or the full profile.
+parser. It can select an explicitly named supported structure file (POSCAR/CONTCAR,
+`.xyz`, `.extxyz`, `.traj`, or `.data`) and can use the unique supported structure in a
+workspace when the request says “the file”. If multiple candidates exist, provide the
+filename explicitly. Other languages or unusual phrasing may require the full profile.
 
 ## Hosted API providers
 

@@ -457,19 +457,24 @@ class Agent:
         self, state: AgentState, tool_name: str
     ) -> dict[str, Any]:
         objective = state.objective
-        source_match = re.search(r"\bconvert\s+([^\s,]+)", objective, re.IGNORECASE)
+        source_match = re.search(
+            r"\bconvert\s+(?:the\s+)?([^\s,]+)", objective, re.IGNORECASE
+        )
         source = source_match.group(1).rstrip(".;") if source_match else None
         # English requests often say “find the POSCAR and convert it”. Resolve
         # the explicitly named standard input file from the workspace.
-        if source in {None, "the", "it", "this", "that"}:
-            for name in ("POSCAR", "CONTCAR"):
-                if re.search(rf"\b{name}\b", objective, re.IGNORECASE):
-                    try:
-                        if self.workspace.resolve(name).is_file():
-                            source = name
-                            break
-                    except ValueError:
-                        pass
+        if source in {None, "the", "it", "this", "that"} or not self._path_is_existing_file(source):
+            mentioned = re.findall(
+                r"\b(?:POSCAR|CONTCAR|[A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data))\b",
+                objective,
+                re.IGNORECASE,
+            )
+            mentioned = list(dict.fromkeys(
+                name for name in mentioned if self._path_is_existing_file(name)
+            ))
+            candidates = mentioned or self._workspace_structure_candidates()
+            if len(candidates) == 1:
+                source = candidates[0]
         if source is not None:
             try:
                 if not self.workspace.resolve(source).is_file():
@@ -498,6 +503,8 @@ class Agent:
                 expected["target_format"] = "xyz"
             elif "lammps" in lowered:
                 expected["target_format"] = "lammps-data"
+            elif destination and destination.lower().endswith(".data"):
+                expected["target_format"] = "lammps-data"
             elif "ase traj" in lowered or ".traj" in lowered:
                 expected["target_format"] = "traj"
             return expected
@@ -510,3 +517,19 @@ class Agent:
                         "destination": result["destination"],
                     }
         return {}
+
+    def _workspace_structure_candidates(self) -> list[str]:
+        names: list[str] = []
+        supported = {"POSCAR", "CONTCAR", ".xyz", ".extxyz", ".traj", ".data"}
+        for path in self.workspace.root.rglob("*"):
+            if not path.is_file() or ".git" in path.parts:
+                continue
+            if path.name in supported or path.suffix.lower() in supported:
+                names.append(self.workspace.relative(path))
+        return names
+
+    def _path_is_existing_file(self, name: str) -> bool:
+        try:
+            return self.workspace.resolve(name).is_file()
+        except ValueError:
+            return False

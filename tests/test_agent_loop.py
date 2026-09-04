@@ -182,3 +182,24 @@ def test_compact_constraints_resolve_the_poscar(tmp_path) -> None:
     state = AgentState(objective="Convert the POSCAR to structure.xyz")
 
     assert agent._compact_expected_arguments(state, "detect_file_format") == {"path": "POSCAR"}
+
+
+def test_compact_constraints_select_explicit_xyz_source(tmp_path) -> None:
+    (tmp_path / "input.xyz").write_text("1\ncomment\nH 0 0 0\n", encoding="utf-8")
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")
+    state = AgentState(objective="Convert the input.xyz to output.traj")
+
+    assert agent._compact_expected_arguments(state, "detect_file_format") == {"path": "input.xyz"}
+    assert agent._compact_expected_arguments(state, "convert_structure") == {
+        "source": "input.xyz",
+        "destination": "output.traj",
+        "target_format": "traj",
+    }
+
+
+def test_compact_constraints_select_unique_structure_file(tmp_path) -> None:
+    (tmp_path / "only.extxyz").write_text("1\nProperties=species:S:1:pos:R:3\nH 0 0 0\n", encoding="utf-8")
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")
+    state = AgentState(objective="Convert the only structure to output.xyz")
+
+    assert agent._compact_expected_arguments(state, "detect_file_format") == {"path": "only.extxyz"}
