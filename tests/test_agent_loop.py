@@ -145,6 +145,7 @@ def test_detailed_progress_requests_factual_observations(tmp_path) -> None:
     )[0]
 
     assert "atom count" in message.content
+    assert "45 words" in message.content
     assert "No speculation" in message.content
 
 
