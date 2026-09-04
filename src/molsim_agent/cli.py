@@ -71,7 +71,10 @@ class ConsoleEvents:
 
     def __call__(self, event: str, payload: dict[str, Any]) -> None:
         if event == "iteration":
-            print(f"\nAgent step {payload['number']}:")
+            print(
+                f"\nAgent loop iteration {payload['number']} "
+                "(LLM request -> tool call or answer):"
+            )
         elif event == "tool_call":
             print(f"tool: {payload['name']}({json.dumps(payload['arguments'], sort_keys=True)})")
         elif event == "tool_result":
