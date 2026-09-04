@@ -81,20 +81,24 @@ class ConsoleEvents:
         self._spinner_stop: threading.Event | None = None
         self._spinner_thread: threading.Thread | None = None
         self._thinking_started: float | None = None
+        self._run_started: float | None = None
+        self._current_action = "Waiting for the model"
 
-    def _start_thinking(self) -> None:
+    def _start_thinking(self, action: str = "Waiting for the model") -> None:
         if not sys.stdout.isatty() or self._spinner_thread is not None:
             return
         stop = threading.Event()
         self._spinner_stop = stop
-        self._thinking_started = time.monotonic()
+        self._current_action = action
+        self._thinking_started = self._thinking_started or time.monotonic()
+        self._run_started = self._run_started or self._thinking_started
 
         def animate() -> None:
             for dots in itertools.cycle((".", "..", "...")):
                 if stop.wait(0.35):
                     return
-                elapsed = time.monotonic() - (self._thinking_started or time.monotonic())
-                print(f"\rThinking{dots} ({elapsed:.0f}s)   ", end="", flush=True)
+                elapsed = time.monotonic() - (self._run_started or time.monotonic())
+                print(f"\r{self._current_action}{dots} ({elapsed:.0f}s)   ", end="", flush=True)
 
         self._spinner_thread = threading.Thread(target=animate, daemon=True)
         self._spinner_thread.start()
@@ -112,10 +116,22 @@ class ConsoleEvents:
 
     def __call__(self, event: str, payload: dict[str, Any]) -> None:
         if event == "iteration":
+            if payload.get("number") == 1:
+                self._run_started = time.monotonic()
             if self.verbose:
                 print(f"\nAgent loop iteration {payload['number']} (LLM turn):")
         elif event == "model_request":
-            self._start_thinking()
+            tools = payload.get("tools", [])
+            tool_name = ""
+            if tools:
+                tool_name = tools[0].get("function", {}).get("name", "")
+            labels = {
+                "detect_file_format": "Checking the file format",
+                "inspect_structure": "Inspecting the structure",
+                "convert_structure": "Converting the structure",
+                "validate_conversion": "Validating the conversion",
+            }
+            self._start_thinking(labels.get(tool_name, "Waiting for the model"))
             if self.verbose:
                 print(f"[debug:model_request] {json.dumps(payload, indent=2, sort_keys=True)}")
         elif event == "model_response":

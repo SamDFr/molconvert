@@ -217,7 +217,9 @@ or a shell command count.
 
 In normal CLI mode, internal runtime guards are hidden. While waiting for an LLM response,
 the CLI shows a small animated `Thinking...` indicator; this is only a waiting indicator,
-not the model's private reasoning. Use `--progress-level detailed` to show factual text
+not the model's private reasoning. The label follows the current runtime action (for
+example `Checking the file format...` or `Validating the conversion...`) and its timer is
+cumulative for the current task. Use `--progress-level detailed` to show factual text
 that the LLM itself returned alongside a tool call. `--verbose` exposes the iteration
 and normalized request/response diagnostics. In normal mode, tool observations are shown
 as concise summaries while `--verbose` prints the complete structured result. Detailed
