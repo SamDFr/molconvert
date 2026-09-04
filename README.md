@@ -150,6 +150,11 @@ Instruction-following models trained for function/tool calling work best. A smal
 may select nonexistent tools, omit required arguments, or stop too early; the registry
 and scientific validators remain authoritative even when model planning is imperfect.
 
+The compact intent router is not a general multilingual parser. It currently recognizes
+common English wording and explicit French structure requests such as `Trouve le POSCAR
+et convertie le en POSCAR.xyz`. Other languages or unusual phrasing may require an
+explicit filename and format, or the full profile.
+
 ## Hosted API providers
 
 The same explicit loop can use hosted providers without changing the tools. Set the

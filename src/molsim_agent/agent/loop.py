@@ -373,19 +373,32 @@ class Agent:
         self, state: AgentState, tool_name: str
     ) -> dict[str, Any]:
         objective = state.objective
-        source_match = re.search(r"\bconvert\s+([^\s,]+)", objective, re.IGNORECASE)
-        destination_match = re.search(
-            r"\bas\s+([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)", objective, re.IGNORECASE
-        )
-        source = source_match.group(1).rstrip(".;") if source_match else None
-        if source is not None:
+        # Prefer explicit, existing simulation filenames mentioned in the goal.
+        # This also handles French phrasing such as “convertie le POSCAR en ...”.
+        source = None
+        for match in re.finditer(r"\b(?:POSCAR|CONTCAR)\b", objective, re.IGNORECASE):
+            candidate_name = match.group(0)
             try:
-                candidate = self.workspace.resolve(source)
+                candidate = self.workspace.resolve(candidate_name)
             except ValueError:
-                source = None
-            else:
-                if not candidate.is_file():
+                continue
+            if candidate.is_file():
+                source = candidate_name
+                break
+        if source is None:
+            source_match = re.search(r"\bconvert\w*\s+([^\s,]+)", objective, re.IGNORECASE)
+            source = source_match.group(1).rstrip(".;") if source_match else None
+            if source is not None:
+                try:
+                    if not self.workspace.resolve(source).is_file():
+                        source = None
+                except ValueError:
                     source = None
+        destination_match = re.search(
+            r"\b(?:as|en|vers|to)\s+([A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data))",
+            objective,
+            re.IGNORECASE,
+        )
         destination = destination_match.group(1) if destination_match else None
 
         if tool_name in {"detect_file_format", "inspect_structure"} and source:
@@ -399,6 +412,8 @@ class Agent:
             lowered = objective.lower()
             if "extended xyz" in lowered or "extxyz" in lowered:
                 expected["target_format"] = "extxyz"
+            elif destination and destination.lower().endswith(".xyz"):
+                expected["target_format"] = "xyz"
             elif "lammps" in lowered:
                 expected["target_format"] = "lammps-data"
             elif "ase traj" in lowered or ".traj" in lowered:
