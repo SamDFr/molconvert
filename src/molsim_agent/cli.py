@@ -159,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
         progress_level=progress_level,
     )
     print("Molecular Simulation Agent")
+    print("Hello! I’m ready to inspect, convert, and validate molecular-simulation files.")
     print(f"Model: {args.model}")
     print(f"Workspace: {workspace}")
 
