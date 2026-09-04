@@ -197,6 +197,7 @@ class Agent:
                     workflow_error = self._workflow_error(state, call.name)
                     if workflow_error is not None:
                         raise ValueError(workflow_error)
+                    self.registry.validate(call.name, call.arguments)
                     if self.dry_run and call.name == "convert_structure":
                         result = {
                             "dry_run": True,

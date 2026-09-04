@@ -51,6 +51,14 @@ class ToolRegistry:
             raise TypeError(f"Tool {name} must return a dictionary")
         return result
 
+    def validate(self, name: str, arguments: dict[str, Any]) -> None:
+        """Validate a model call without executing its Python function."""
+        try:
+            tool = self._tools[name]
+        except KeyError as exc:
+            raise ValueError(f"Unknown tool: {name}") from exc
+        self._validate_arguments(tool, arguments)
+
     @staticmethod
     def _validate_arguments(tool: ToolSpec, arguments: dict[str, Any]) -> None:
         if not isinstance(arguments, dict):
