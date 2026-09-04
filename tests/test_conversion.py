@@ -44,6 +44,15 @@ def test_poscar_to_lammps_data_preserves_basic_structure(workspace: Workspace) -
     assert report["required_structure_properties_preserved"] is False
 
 
+def test_poscar_to_cif_preserves_basic_structure(workspace: Workspace) -> None:
+    result = convert_structure(workspace, "POSCAR", "structure.cif", "cif")
+    report = validate_conversion(workspace, "POSCAR", "structure.cif")
+
+    assert result["target_format"] == "cif"
+    assert report["atom_count"] == "preserved"
+    assert report["species"] == "preserved"
+
+
 def test_xyz_to_ase_traj(workspace: Workspace) -> None:
     convert_structure(workspace, "POSCAR", "plain.xyz", "xyz")
     convert_structure(workspace, "plain.xyz", "structure.traj", "traj")

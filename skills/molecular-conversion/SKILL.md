@@ -7,7 +7,7 @@ preservation, loss, and uncertainty explicit.
 
 ## Supported tasks
 
-- Inspect VASP POSCAR/CONTCAR, XYZ/extXYZ, ASE `.traj`, and LAMMPS data structures.
+- Inspect VASP POSCAR/CONTCAR, XYZ/extXYZ, CIF, ASE `.traj`, and LAMMPS data structures.
 - Convert structures among those formats using `convert_structure`.
 - Validate a converted structure against its source using `validate_conversion`.
 - Search for batches of supported files and create output directories.

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-SUPPORTED_FORMATS = ("vasp", "xyz", "extxyz", "traj", "lammps-data")
+SUPPORTED_FORMATS = ("vasp", "xyz", "extxyz", "traj", "lammps-data", "cif")
 
 
 def detect_format(path: Path) -> tuple[str | None, list[str]]:
@@ -17,6 +17,8 @@ def detect_format(path: Path) -> tuple[str | None, list[str]]:
         return "vasp", []
     if suffix == ".traj":
         return "traj", []
+    if suffix == ".cif":
+        return "cif", []
     if suffix in {".data", ".lammps", ".lmp"} or "lammps" in name:
         return "lammps-data", []
     if suffix == ".xyz":
@@ -42,6 +44,7 @@ def normalize_format(format_name: str) -> str:
         "ase-traj": "traj",
         "lammps": "lammps-data",
         "lammpsdata": "lammps-data",
+        "cif": "cif",
         "poscar": "vasp",
         "contcar": "vasp",
     }

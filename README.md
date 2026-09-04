@@ -6,8 +6,8 @@ their structured results, validates scientific preservation, and reports limitat
 The orchestration loop is intentionally implemented here—there is no LangChain,
 LangGraph, CrewAI, AutoGen, or other agent framework hiding it.
 
-Version 0.1 focuses on structures in VASP POSCAR/CONTCAR, XYZ/extXYZ, ASE `.traj`, and
-LAMMPS data formats. It does not pretend that simulation input decks are interchangeable.
+Version 0.1 focuses on structures in VASP POSCAR/CONTCAR, XYZ/extXYZ, CIF, ASE `.traj`,
+and LAMMPS data formats. It does not pretend that simulation input decks are interchangeable.
 
 ## Conversion semantics
 
@@ -152,7 +152,7 @@ and scientific validators remain authoritative even when model planning is imper
 
 The compact intent router is intentionally English-only, not a general multilingual
 parser. It can select an explicitly named supported structure file (POSCAR/CONTCAR,
-`.xyz`, `.extxyz`, `.traj`, or `.data`) and can use the unique supported structure in a
+`.xyz`, `.extxyz`, `.traj`, `.data`, or `.cif`) and can use the unique supported structure in a
 workspace when the request says “the file”. If multiple candidates exist, provide the
 filename explicitly. Other languages or unusual phrasing may require the full profile.
 

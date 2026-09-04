@@ -322,6 +322,11 @@ class Agent:
             "validate_conversion",
         )
         successful = self._successful_tool_names(state)
+        if tool_name == "convert_structure" and "inspect_structure" in successful:
+            # Full-profile models may request several independent output formats
+            # in one response (for example XYZ and CIF). Each is still validated
+            # later by its own source/destination pair.
+            return None
         next_tool = next((name for name in sequence if name not in successful), None)
         if next_tool is not None and tool_name != next_tool:
             return f"Workflow order requires {next_tool!r} before {tool_name!r}"
@@ -466,7 +471,7 @@ class Agent:
         # the explicitly named standard input file from the workspace.
         if source in {None, "the", "it", "this", "that"} or not self._path_is_existing_file(source):
             mentioned = re.findall(
-                r"\b(?:POSCAR|CONTCAR|[A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data))\b",
+                r"\b(?:POSCAR|CONTCAR|[A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data|cif))\b",
                 objective,
                 re.IGNORECASE,
             )
@@ -483,7 +488,7 @@ class Agent:
             except ValueError:
                 source = None
         destination_match = re.search(
-            r"\b(?:as|to)\s+([A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data))",
+            r"\b(?:as|to)\s+([A-Za-z0-9_./-]+\.(?:xyz|extxyz|traj|data|cif))",
             objective,
             re.IGNORECASE,
         )
@@ -506,6 +511,8 @@ class Agent:
                 expected["target_format"] = "lammps-data"
             elif destination and destination.lower().endswith(".data"):
                 expected["target_format"] = "lammps-data"
+            elif destination and destination.lower().endswith(".cif"):
+                expected["target_format"] = "cif"
             elif "ase traj" in lowered or ".traj" in lowered:
                 expected["target_format"] = "traj"
             return expected
@@ -521,7 +528,7 @@ class Agent:
 
     def _workspace_structure_candidates(self) -> list[str]:
         names: list[str] = []
-        supported = {"POSCAR", "CONTCAR", ".xyz", ".extxyz", ".traj", ".data"}
+        supported = {"POSCAR", "CONTCAR", ".xyz", ".extxyz", ".traj", ".data", ".cif"}
         for path in self.workspace.root.rglob("*"):
             if not path.is_file() or ".git" in path.parts:
                 continue

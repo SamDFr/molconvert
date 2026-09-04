@@ -16,6 +16,7 @@ FORMAT_LIMITATIONS: dict[str, list[str]] = {
     "lammps-data": ["pbc", "velocities", "constraints", "charges", "forces", "energy"],
     "extxyz": ["constraints"],
     "traj": [],
+    "cif": ["velocities", "constraints", "charges", "forces", "energy"],
 }
 
 
@@ -96,7 +97,7 @@ def conversion_tool_specs(workspace: Workspace) -> list[ToolSpec]:
                     "destination": {"type": "string"},
                     "target_format": {
                         "type": "string",
-                        "enum": ["vasp", "xyz", "extxyz", "traj", "lammps-data"],
+                        "enum": ["vasp", "xyz", "extxyz", "traj", "lammps-data", "cif"],
                     },
                     "overwrite": {
                         "type": "boolean",

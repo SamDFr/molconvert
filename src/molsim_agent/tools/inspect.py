@@ -52,7 +52,7 @@ def inspection_tool_specs(
     return [
         ToolSpec(
             "detect_file_format",
-            "Detect whether a file is a supported VASP, XYZ/extXYZ, ASE traj, or LAMMPS data file.",
+            "Detect whether a file is a supported VASP, XYZ/extXYZ, CIF, ASE traj, or LAMMPS data file.",
             path_parameter,
             lambda path: detect_file_format(workspace, path),
             {"filesystem": "read", "workspace_only": True},

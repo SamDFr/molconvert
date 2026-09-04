@@ -4,7 +4,7 @@ from pathlib import Path
 
 from molsim_agent import Agent
 from molsim_agent.agent.messages import LLMResponse, ToolCall
-from molsim_agent.agent.state import AgentState
+from molsim_agent.agent.state import AgentState, ToolExecution
 from molsim_agent.llm.mock import MockBackend
 from molsim_agent.llm.ollama import OllamaBackend
 
@@ -171,6 +171,26 @@ def test_full_profile_blocks_plan_only_conversion_answer(tmp_path) -> None:
 
     assert blocker is not None
     assert "detect_file_format" in blocker
+
+
+def test_full_profile_allows_multiple_output_conversions(tmp_path) -> None:
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="full")
+    state = AgentState(objective="Convert POSCAR to structure.xyz and structure.cif")
+    state.tool_executions.extend(
+        [
+            ToolExecution(
+                ToolCall("1", "detect_file_format", {"path": "POSCAR"}), {"ok": True}
+            ),
+            ToolExecution(
+                ToolCall("2", "inspect_structure", {"path": "POSCAR"}), {"ok": True}
+            ),
+            ToolExecution(
+                ToolCall("3", "convert_structure", {"source": "POSCAR", "destination": "structure.xyz", "target_format": "xyz"}), {"ok": True}
+            ),
+        ]
+    )
+
+    assert agent._workflow_error(state, "convert_structure") is None
 
 
 def test_compact_constraints_resolve_find_poscar_convert_it(tmp_path) -> None:
