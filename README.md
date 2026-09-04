@@ -150,6 +150,27 @@ Instruction-following models trained for function/tool calling work best. A smal
 may select nonexistent tools, omit required arguments, or stop too early; the registry
 and scientific validators remain authoritative even when model planning is imperfect.
 
+## Hosted API providers
+
+The same explicit loop can use hosted providers without changing the tools. Set the
+provider-specific key in the environment and select `--provider`:
+
+```bash
+export OPENAI_API_KEY="..."
+molsim-agent --provider openai --model gpt-5-mini --workspace ./simulation
+
+export MISTRAL_API_KEY="..."
+molsim-agent --provider mistral --model mistral-small-latest --workspace ./simulation
+
+export ANTHROPIC_API_KEY="..."
+molsim-agent --provider anthropic --model claude-3-5-haiku-latest --workspace ./simulation
+```
+
+OpenAI and Mistral use the OpenAI-compatible Chat Completions adapter. Claude uses the
+Anthropic Messages adapter. `--api-key` and `--base-url` are available for testing, but
+environment variables are safer. API providers are optional: Ollama remains the default
+and no cloud dependency or key is required for local use.
+
 ## First example
 
 Place a `POSCAR` in a workspace, launch the CLI, and ask:
