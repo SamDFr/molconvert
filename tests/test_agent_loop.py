@@ -107,6 +107,25 @@ def test_detailed_progress_requests_factual_observations(tmp_path) -> None:
     assert "never guess" in message.content
 
 
+def test_progress_mode_requires_model_announcement_before_tool(tmp_path) -> None:
+    backend = MockBackend(
+        [
+            LLMResponse(tool_calls=[ToolCall("1", "list_directory", {"path": "."})]),
+            LLMResponse(
+                content="I will inspect the workspace now.",
+                tool_calls=[ToolCall("2", "list_directory", {"path": "."})],
+            ),
+            LLMResponse(content="The workspace is ready."),
+        ]
+    )
+    state = Agent(
+        backend=backend, workspace=tmp_path, progress_level="brief"
+    ).run("List the files")
+
+    assert len(state.tool_executions) == 1
+    assert state.final_answer == "The workspace is ready."
+
+
 def test_compact_constraints_resolve_find_poscar_convert_it(tmp_path) -> None:
     (tmp_path / "POSCAR").write_text("fixture", encoding="utf-8")
     agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")

@@ -126,6 +126,8 @@ class ConsoleEvents:
         elif event == "completion_blocked":
             if self.verbose:
                 print(f"Runtime guard: {payload['reason']}")
+        elif event == "progress_required" and self.verbose:
+            print("[debug] The model must announce its next action before the tool runs.")
         elif self.verbose and event in {"model_request", "model_response", "limit"}:
             print(f"[debug:{event}] {json.dumps(payload, indent=2, sort_keys=True)}")
 

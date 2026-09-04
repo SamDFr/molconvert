@@ -145,6 +145,23 @@ class Agent:
             )
             state.messages.append(assistant)
 
+            if (
+                self.progress_level != "off"
+                and response.tool_calls
+                and not response.content.strip()
+            ):
+                # In progress mode, require the model to announce its next action
+                # in its own words before executing a tool. This avoids fabricating
+                # canned status text in the runtime.
+                reminder = (
+                    "Progress announcement required: before requesting a tool, write one "
+                    "user-facing sentence saying what you found and what you will do next. "
+                    "Use only known observations; do not reveal chain-of-thought."
+                )
+                state.messages.append(Message(role="system", content=reminder))
+                self._emit("progress_required", {"tool": response.tool_calls[0].name})
+                continue
+
             if not response.tool_calls:
                 if not response.content.strip():
                     state.warnings.append("Model returned neither a tool call nor an answer")
