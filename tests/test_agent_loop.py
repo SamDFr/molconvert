@@ -72,6 +72,17 @@ def test_agent_stops_after_repeated_empty_model_responses(tmp_path) -> None:
     assert any("empty model responses" in warning for warning in state.warnings)
 
 
+def test_agent_stops_after_repeated_premature_answers(tmp_path) -> None:
+    backend = MockBackend([LLMResponse(content="I will convert it."), LLMResponse(content="Done.")])
+
+    state = Agent(backend=backend, workspace=tmp_path, max_iterations=20).run(
+        "Convert POSCAR to output.xyz"
+    )
+
+    assert state.iteration_count == 2
+    assert "required workflow tools" in state.final_answer
+
+
 def test_agent_loads_molecular_conversion_skill(tmp_path) -> None:
     backend = MockBackend([LLMResponse(content="Done")])
 

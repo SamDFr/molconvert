@@ -113,6 +113,7 @@ class Agent:
             [Message(role="system", content=self.system_prompt), Message(role="user", content=objective)]
         )
         empty_model_responses = 0
+        blocked_model_responses = 0
 
         for iteration in range(1, self.max_iterations + 1):
             state.iteration_count = iteration
@@ -201,9 +202,26 @@ class Agent:
                     continue
                 blocker = self._completion_blocker(state)
                 if blocker is not None:
+                    blocked_model_responses += 1
+                    if blocked_model_responses >= 2:
+                        state.warnings.append(
+                            "Stopped after repeated premature final answers; required "
+                            "workflow tools were not called."
+                        )
+                        state.final_answer = (
+                            "I could not continue because the model repeatedly returned a "
+                            "final message before calling the required workflow tools. "
+                            "Try --no-think or a model with stronger tool-calling support."
+                        )
+                        self._emit(
+                            "limit",
+                            {"iterations": iteration, "reason": "repeated_blocked_answer"},
+                        )
+                        return state
                     state.messages.append(Message(role="system", content=blocker))
                     self._emit("completion_blocked", {"reason": blocker})
                     continue
+                blocked_model_responses = 0
                 state.final_answer = response.content
                 self._emit("final", {"content": response.content})
                 return state
