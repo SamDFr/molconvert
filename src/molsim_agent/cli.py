@@ -5,6 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +50,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Enable or disable Ollama model thinking when supported",
     )
-    parser.add_argument("--max-iterations", type=int, default=12)
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=20,
+        help="Maximum LLM/tool loop iterations (default: 20)",
+    )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
         "--progress",
@@ -68,23 +76,56 @@ class ConsoleEvents:
     def __init__(self, verbose: bool, progress: bool = False) -> None:
         self.verbose = verbose
         self.progress = progress
+        self._spinner_stop: threading.Event | None = None
+        self._spinner_thread: threading.Thread | None = None
+
+    def _start_thinking(self) -> None:
+        if not sys.stdout.isatty() or self._spinner_thread is not None:
+            return
+        stop = threading.Event()
+        self._spinner_stop = stop
+
+        def animate() -> None:
+            for dots in (".", "..", "..."):
+                if stop.wait(0.35):
+                    return
+                print(f"\rThinking{dots}   ", end="", flush=True)
+
+        self._spinner_thread = threading.Thread(target=animate, daemon=True)
+        self._spinner_thread.start()
+
+    def _stop_thinking(self) -> None:
+        if self._spinner_stop is not None:
+            self._spinner_stop.set()
+        if self._spinner_thread is not None:
+            self._spinner_thread.join(timeout=1)
+        if self._spinner_thread is not None and sys.stdout.isatty():
+            print("\r                 \r", end="", flush=True)
+        self._spinner_stop = None
+        self._spinner_thread = None
 
     def __call__(self, event: str, payload: dict[str, Any]) -> None:
         if event == "iteration":
-            print(
-                f"\nAgent loop iteration {payload['number']} "
-                "(LLM request -> tool call or answer):"
-            )
+            if self.verbose:
+                print(f"\nAgent loop iteration {payload['number']} (LLM turn):")
+        elif event == "model_request":
+            self._start_thinking()
+            if self.verbose:
+                print(f"[debug:model_request] {json.dumps(payload, indent=2, sort_keys=True)}")
+        elif event == "model_response":
+            self._stop_thinking()
+            if self.progress and payload.get("content") and payload.get("tool_calls"):
+                print(f"Progress: {payload['content'].strip()}")
+            if self.verbose:
+                print(f"[debug:model_response] {json.dumps(payload, indent=2, sort_keys=True)}")
         elif event == "tool_call":
             print(f"tool: {payload['name']}({json.dumps(payload['arguments'], sort_keys=True)})")
         elif event == "tool_result":
             print("Observation:")
             print(json.dumps(payload["observation"], indent=2, sort_keys=True))
-        elif event == "model_response" and self.progress and payload.get("content"):
-            if payload.get("tool_calls"):
-                print(f"Progress: {payload['content'].strip()}")
         elif event == "completion_blocked":
-            print(f"Runtime guard: {payload['reason']}")
+            if self.verbose:
+                print(f"Runtime guard: {payload['reason']}")
         elif self.verbose and event in {"model_request", "model_response", "limit"}:
             print(f"[debug:{event}] {json.dumps(payload, indent=2, sort_keys=True)}")
 
