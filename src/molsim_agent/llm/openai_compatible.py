@@ -53,7 +53,11 @@ class OpenAICompatibleBackend(LLMBackend):
         request = Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+                "User-Agent": "molsim-agent/0.1",
+            },
             method="POST",
         )
         try:
