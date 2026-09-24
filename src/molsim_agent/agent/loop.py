@@ -487,12 +487,19 @@ class Agent:
             "validate_conversion",
         )
         next_tool = next((name for name in sequence if name not in successful), None)
-        directive = (
+        if not self._tool_relevant_objective(state.objective):
+            next_tool = None
+            directive = (
+                "Answer the user's message naturally and briefly. Do not invent a scientific "
+                "task, report, experiment, or results, and do not call tools."
+            )
+        else:
+            directive = (
             f"Call {next_tool} now using the native tool interface. Do not write a plan or "
             "describe the call in text."
             if next_tool is not None and self._is_conversion_objective(state.objective)
             else "All required tools completed. Give the concise scientific report now."
-        )
+            )
         if self.progress_level == "brief" and next_tool is not None:
             directive = (
                 f"Call {next_tool} now using the native tool interface. Before the tool call, "

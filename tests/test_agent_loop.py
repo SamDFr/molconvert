@@ -113,6 +113,7 @@ def test_greeting_does_not_send_tool_schemas(tmp_path) -> None:
     state = AgentState(objective="bonjour")
 
     assert agent._tool_schemas_for_state(state) == []
+    assert "Answer the user's message naturally" in agent._messages_for_model(state)[0].content
 
 
 def test_compact_tool_schemas_use_portable_json_schema(tmp_path) -> None:
