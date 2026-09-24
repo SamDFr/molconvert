@@ -77,11 +77,20 @@ def test_plain_xyz_validation_reports_lost_cell_and_pbc(workspace: Workspace) ->
     assert report["required_structure_properties_preserved"] is False
 
 
-def test_conversion_refuses_overwrite_by_default(workspace: Workspace) -> None:
+def test_conversion_chooses_new_name_without_overwriting(workspace: Workspace) -> None:
     convert_structure(workspace, "POSCAR", "structure.xyz", "extxyz")
 
-    with pytest.raises(FileExistsError, match="overwrite=true"):
-        convert_structure(workspace, "POSCAR", "structure.xyz", "extxyz")
+    result = convert_structure(workspace, "POSCAR", "structure.xyz", "extxyz")
+
+    assert result["requested_destination"] == "structure.xyz"
+    assert result["destination"] == "structure_1.xyz"
+    assert result["destination_adjusted"] is True
+    assert result["created_files"] == ["structure_1.xyz"]
+    assert (workspace.root / "structure.xyz").is_file()
+    assert (workspace.root / "structure_1.xyz").is_file()
+
+    third = convert_structure(workspace, "POSCAR", "structure.xyz", "extxyz")
+    assert third["destination"] == "structure_2.xyz"
 
 
 def test_conversion_cannot_write_outside_workspace(workspace: Workspace) -> None:

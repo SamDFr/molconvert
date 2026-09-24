@@ -553,10 +553,20 @@ class Agent:
     @staticmethod
     def _is_conversion_objective(objective: str) -> bool:
         """Recognize common conversion verbs without making the LLM parse the task alone."""
-        return bool(re.search(r"\bconvert\b", objective, re.IGNORECASE)) or bool(
+        # Include common French inflections and tolerate a small typo such as
+        # ``conbverti``. This only classifies the workflow; tool arguments remain
+        # validated separately and no scientific mapping is inferred here.
+        if re.search(
+            r"\b(?:convert\w*|con\w*vert\w*|transform\w*|export\w*|"
+            r"write|save|turn|change|convertir|transformer)\b",
+            objective,
+            re.IGNORECASE,
+        ):
+            return True
+        return bool(
             re.search(
-                r"\b(?:convert|transform|export|write|save|turn|change)\b.*"
-                r"\b(?:to|into|as)\b",
+                r"\b(?:to|into|as|en|vers|verso)\b.*\b(?:xyz|extxyz|cif|traj|"
+                r"lammps|poscar|structure|format)\b",
                 objective,
                 re.IGNORECASE | re.DOTALL,
             )

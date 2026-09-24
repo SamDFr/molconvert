@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from ase import Atoms
 
 from molsim_agent.formats.detection import normalize_format
@@ -31,11 +33,12 @@ def convert_structure(
     destination_path = workspace.resolve(destination)
     if source_path == destination_path:
         raise ValueError("Source and destination must be different files")
+    requested_destination = workspace.relative(destination_path)
+    destination_adjusted = False
+    if destination_path.exists() and not overwrite:
+        destination_path = _next_available_destination(destination_path)
+        destination_adjusted = True
     existed_before = destination_path.exists()
-    if existed_before and not overwrite:
-        raise FileExistsError(
-            f"Destination already exists: {destination}. Set overwrite=true only if explicitly requested."
-        )
     if not destination_path.parent.is_dir():
         raise FileNotFoundError(
             f"Destination directory does not exist: {workspace.relative(destination_path.parent)}"
@@ -45,6 +48,11 @@ def convert_structure(
     normalized_target = normalize_format(target_format)
     write_structure(destination_path, atoms, normalized_target)
     warnings = list(read_warnings)
+    if destination_adjusted:
+        warnings.append(
+            f"Requested destination {requested_destination} already existed; wrote a new file "
+            f"at {workspace.relative(destination_path)} instead."
+        )
     limitations = FORMAT_LIMITATIONS[normalized_target]
     present = _present_properties(atoms)
     at_risk = [name for name in limitations if present[name]]
@@ -56,6 +64,8 @@ def convert_structure(
     return {
         "source": workspace.relative(source_path),
         "destination": workspace.relative(destination_path),
+        "requested_destination": requested_destination,
+        "destination_adjusted": destination_adjusted,
         "source_format": source_format,
         "target_format": normalized_target,
         "atom_count": len(atoms),
@@ -69,6 +79,20 @@ def convert_structure(
         "created_files": [] if existed_before else [workspace.relative(destination_path)],
         "modified_files": [workspace.relative(destination_path)] if existed_before else [],
     }
+
+
+def _next_available_destination(path: Path) -> Path:
+    """Return ``path`` or a numbered sibling without overwriting an existing file."""
+    if not path.exists():
+        return path
+    suffix = path.suffix
+    stem = path.name[: -len(suffix)] if suffix else path.name
+    index = 1
+    while True:
+        candidate = path.with_name(f"{stem}_{index}{suffix}")
+        if not candidate.exists():
+            return candidate
+        index += 1
 
 
 def _present_properties(atoms: Atoms) -> dict[str, bool]:

@@ -10,7 +10,8 @@ runtime-provided safe derived filename (for example `POSCAR.data`) rather than i
 scientific content.
 
 Never invent coordinates, units, parameters, or mappings. Never overwrite unless the
-user explicitly requested it. Use `extxyz`, not plain `xyz`, when cell and PBC must be
+user explicitly requested it. If the requested output exists, preserve it and use a
+numbered sibling (`file_1.ext`, etc.), reporting the actual destination. Use `extxyz`, not plain `xyz`, when cell and PBC must be
 preserved. The runtime will require detection, inspection, conversion, and validation in
 safe order. Report every loss or `not_encoded` property after the tools are complete.
 Workflow translation is not structure conversion.

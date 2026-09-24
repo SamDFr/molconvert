@@ -409,8 +409,10 @@ files. Skills guide planning; they do not bypass tool or safety enforcement.
 
 - Every tool resolves paths against one canonical workspace; `..`, absolute paths, and
   symlinks cannot escape it.
-- Existing outputs are not overwritten unless `overwrite=true`, which the skill permits
-  only after an explicit user request.
+- Existing outputs are never overwritten by default. If the requested destination already
+  exists, the runtime chooses a numbered sibling (`file_1.ext`, then `file_2.ext`, etc.)
+  and reports both the requested and actual destination. `overwrite=true` is reserved for
+  an explicit user request.
 - There is no arbitrary shell tool.
 - ASE, not the LLM, parses and writes atomic data.
 - Every conversion should be re-read and validated rather than trusted after writing.

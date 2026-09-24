@@ -293,6 +293,19 @@ def test_compact_intent_normalizes_natural_language_aliases(tmp_path) -> None:
     }
 
 
+def test_compact_intent_detects_french_conversion_and_small_typo(tmp_path) -> None:
+    (tmp_path / "POSCAR").write_text("fixture", encoding="utf-8")
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")
+    state = AgentState(objective="conbverti le POSCAR en XYZ")
+
+    assert agent._is_conversion_objective(state.objective)
+    assert agent._compact_expected_arguments(state, "convert_structure") == {
+        "source": "POSCAR",
+        "destination": "POSCAR.xyz",
+        "target_format": "xyz",
+    }
+
+
 def test_compact_constraints_resolve_the_poscar(tmp_path) -> None:
     (tmp_path / "POSCAR").write_text("fixture", encoding="utf-8")
     agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")

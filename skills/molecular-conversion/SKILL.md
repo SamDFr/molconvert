@@ -32,7 +32,9 @@ translation, not structure conversion, and is outside v0.1.
 1. Locate and detect the requested source file.
 2. Inspect it before conversion.
 3. Use `convert_structure`; never generate coordinate text in an answer or file.
-4. Never overwrite an existing destination unless the user explicitly asked for it.
+4. Never overwrite an existing destination unless the user explicitly asked for it. If it
+   already exists, preserve it and use a numbered sibling such as `file_1.ext`; report
+   the adjusted destination and validate that actual file.
 5. Use extended XYZ (`extxyz`), not plain XYZ, when cell and PBC must be retained.
 6. Treat format capability notes as risks until validation establishes the actual result.
 
