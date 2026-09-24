@@ -38,4 +38,5 @@ def test_groq_backend_uses_groq_environment_key_without_logging_it(monkeypatch) 
     request = open_url.call_args.args[0]
     assert request.full_url == "https://api.groq.com/openai/v1/chat/completions"
     assert request.get_header("Authorization") == "Bearer secret-groq-key"
+    assert "tools" not in json.loads(request.data)
     assert result.content == "ok"

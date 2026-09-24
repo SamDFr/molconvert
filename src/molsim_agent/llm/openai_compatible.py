@@ -44,8 +44,12 @@ class OpenAICompatibleBackend(LLMBackend):
         payload = {
             "model": self.model,
             "messages": [self._message(message) for message in messages],
-            "tools": list(tools),
         }
+        # Omit the field entirely for ordinary conversation. Some compatible
+        # providers reject an explicit empty tools array even though the API
+        # specification permits it.
+        if tools:
+            payload["tools"] = list(tools)
         request = Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(payload).encode(),
