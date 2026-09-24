@@ -407,6 +407,8 @@ class Agent:
 
     def _tool_schemas_for_state(self, state: AgentState) -> list[dict[str, Any]]:
         schemas = deepcopy(self.registry.schemas())
+        if not self._tool_relevant_objective(state.objective):
+            return []
         if self.profile != "compact" or not self._is_conversion_objective(state.objective):
             return schemas
         successful_tools = self._successful_tool_names(state)
@@ -431,6 +433,20 @@ class Agent:
                 if name in properties:
                     properties[name]["const"] = value
         return selected
+
+    @staticmethod
+    def _tool_relevant_objective(objective: str) -> bool:
+        """Avoid sending tool schemas for greetings and ordinary conversation."""
+        if Agent._is_conversion_objective(objective):
+            return True
+        return bool(
+            re.search(
+                r"\b(?:file|files|directory|folder|workspace|structure|inspect|detect|"
+                r"read|find|list|validate|simulation|poscar|xyz|cif|lammps|traj)\b",
+                objective,
+                re.IGNORECASE,
+            )
+        )
 
     @staticmethod
     def _successful_tool_names(state: AgentState) -> set[str]:

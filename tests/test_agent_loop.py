@@ -54,7 +54,7 @@ def test_agent_stops_at_iteration_limit(tmp_path) -> None:
         [LLMResponse(tool_calls=[ToolCall(str(i), "list_directory", {})]) for i in range(2)]
     )
 
-    state = Agent(backend=backend, workspace=tmp_path, max_iterations=2).run("Keep looking")
+    state = Agent(backend=backend, workspace=tmp_path, max_iterations=2).run("List the files")
 
     assert state.iteration_count == 2
     assert "maximum" in state.warnings[0]
@@ -106,6 +106,13 @@ def test_auto_profile_uses_compact_context_for_ollama(tmp_path) -> None:
         "validate_conversion",
     }
     assert "Compact Molecular Conversion" in agent.system_prompt
+
+
+def test_greeting_does_not_send_tool_schemas(tmp_path) -> None:
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")
+    state = AgentState(objective="bonjour")
+
+    assert agent._tool_schemas_for_state(state) == []
 
 
 def test_llm_intent_mode_rewrites_before_agent_loop(tmp_path) -> None:

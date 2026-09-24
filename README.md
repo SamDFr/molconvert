@@ -146,6 +146,10 @@ the user omits an output filename, it derives a safe name such as `POSCAR.data` 
 LAMMPS data file or `POSCAR.xyz` for XYZ. Scientific choices—units, potentials, boundary
 semantics, and workflow mappings—are never inferred.
 
+For ordinary conversation such as `hello` or `bonjour`, the runtime sends no tool schemas
+to the provider. This keeps providers/models that do not accept function tools usable for
+simple chat while preserving the full tool set for file and structure requests.
+
 ### Intent normalization modes
 
 The default `--intent-mode deterministic` uses local rules and adds no model request. It
