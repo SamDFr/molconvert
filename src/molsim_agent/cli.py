@@ -14,7 +14,12 @@ from typing import Any
 
 from molsim_agent import Agent
 from molsim_agent.llm.ollama import OllamaBackend, OllamaError
-from molsim_agent.llm.openai_compatible import MistralBackend, OpenAICompatibleBackend, APIError
+from molsim_agent.llm.openai_compatible import (
+    APIError,
+    GroqBackend,
+    MistralBackend,
+    OpenAICompatibleBackend,
+)
 from molsim_agent.llm.anthropic import AnthropicBackend
 
 
@@ -30,7 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ollama model name (or set MOLSIM_AGENT_MODEL)",
     )
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
-    parser.add_argument("--provider", choices=("ollama", "openai", "mistral", "anthropic"), default="ollama")
+    parser.add_argument(
+        "--provider",
+        choices=("ollama", "openai", "mistral", "groq", "anthropic"),
+        default="ollama",
+    )
     parser.add_argument("--base-url", help="Optional API base URL for OpenAI-compatible providers")
     parser.add_argument("--api-key", help="API key (prefer OPENAI_API_KEY, MISTRAL_API_KEY, or ANTHROPIC_API_KEY)")
     parser.add_argument(
@@ -202,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
         backend = OpenAICompatibleBackend(args.model, api_key=args.api_key, base_url=args.base_url or "https://api.openai.com/v1", timeout=args.timeout)
     elif args.provider == "mistral":
         backend = MistralBackend(args.model, api_key=args.api_key, base_url=args.base_url or "https://api.mistral.ai/v1", timeout=args.timeout)
+    elif args.provider == "groq":
+        backend = GroqBackend(args.model, api_key=args.api_key, base_url=args.base_url or "https://api.groq.com/openai/v1", timeout=args.timeout)
     else:
         backend = AnthropicBackend(args.model, api_key=args.api_key, base_url=args.base_url or "https://api.anthropic.com", timeout=args.timeout)
     progress_enabled = args.progress_level not in (None, "off") or args.progress

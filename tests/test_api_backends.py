@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from molsim_agent.agent.messages import Message
 from molsim_agent.llm.anthropic import AnthropicBackend
-from molsim_agent.llm.openai_compatible import OpenAICompatibleBackend
+from molsim_agent.llm.openai_compatible import GroqBackend, OpenAICompatibleBackend
 
 
 def _response(payload: dict) -> MagicMock:
@@ -27,3 +27,15 @@ def test_anthropic_normalizes_tool_use() -> None:
         result = AnthropicBackend("claude-test", api_key="key").chat([Message("user", "list")], [])
     assert result.content == "checking"
     assert result.tool_calls[0].name == "list_directory"
+
+
+def test_groq_backend_uses_groq_environment_key_without_logging_it(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "secret-groq-key")
+    payload = {"choices": [{"message": {"content": "ok"}}]}
+    with patch("molsim_agent.llm.openai_compatible.urlopen", return_value=_response(payload)) as open_url:
+        result = GroqBackend("llama-3.1-8b-instant").chat([Message("user", "hello")], [])
+
+    request = open_url.call_args.args[0]
+    assert request.full_url == "https://api.groq.com/openai/v1/chat/completions"
+    assert request.get_header("Authorization") == "Bearer secret-groq-key"
+    assert result.content == "ok"

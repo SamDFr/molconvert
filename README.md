@@ -226,14 +226,29 @@ molsim-agent --provider openai --model gpt-5-mini --workspace ./simulation
 export MISTRAL_API_KEY="..."
 molsim-agent --provider mistral --model mistral-small-latest --workspace ./simulation
 
+export GROQ_API_KEY="..."
+molsim-agent --provider groq --model llama-3.1-8b-instant --workspace ./simulation
+
 export ANTHROPIC_API_KEY="..."
 molsim-agent --provider anthropic --model claude-3-5-haiku-latest --workspace ./simulation
 ```
 
-OpenAI and Mistral use the OpenAI-compatible Chat Completions adapter. Claude uses the
-Anthropic Messages adapter. `--api-key` and `--base-url` are available for testing, but
-environment variables are safer. API providers are optional: Ollama remains the default
-and no cloud dependency or key is required for local use.
+OpenAI, Mistral, and Groq use the OpenAI-compatible Chat Completions adapter. Claude uses
+the Anthropic Messages adapter. `--api-key` and `--base-url` are available for testing,
+but environment variables are safer because secrets do not appear in shell history or
+process arguments. For Groq, the adapter uses `https://api.groq.com/openai/v1` and reads
+`GROQ_API_KEY`. Groq supports local function calling, so the agent still executes the
+filesystem and ASE tools on your computer rather than delegating them to the provider.
+API providers are optional: Ollama remains the default and no cloud dependency or key is
+required for local use.
+
+### API-key safety
+
+Never commit a key, put it in a prompt, or paste it into source code. Prefer a short-lived
+shell environment variable, a password manager, or the macOS Keychain. If a key is ever
+printed, committed, or shared, revoke it immediately in the provider console and create a
+replacement. The application sends the key only as an HTTP authorization header; it is
+not included in `AgentState`, tool observations, progress messages, or debug payloads.
 
 ## First example
 

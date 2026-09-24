@@ -97,3 +97,12 @@ class MistralBackend(OpenAICompatibleBackend):
         kwargs.setdefault("api_key", os.environ.get("MISTRAL_API_KEY"))
         kwargs.setdefault("base_url", "https://api.mistral.ai/v1")
         super().__init__(model, **kwargs)
+
+
+class GroqBackend(OpenAICompatibleBackend):
+    """Groq's OpenAI-compatible Chat Completions endpoint."""
+
+    def __init__(self, model: str, **kwargs: Any) -> None:
+        api_key = kwargs.pop("api_key", None) or os.environ.get("GROQ_API_KEY")
+        base_url = kwargs.pop("base_url", None) or "https://api.groq.com/openai/v1"
+        super().__init__(model, api_key=api_key, base_url=base_url, **kwargs)
