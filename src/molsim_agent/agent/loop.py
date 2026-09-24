@@ -604,6 +604,7 @@ class Agent:
                 r"\bfrom\s+([^\s,]+)", objective, re.IGNORECASE
             )
         source = source_match.group(1).rstrip(".;") if source_match else None
+        source_format_hint = self._source_format_hint(source)
         # English requests often say “find the POSCAR and convert it”. Resolve
         # the explicitly named standard input file from the workspace.
         if source in {None, "the", "it", "this", "that"} or not self._path_is_existing_file(source):
@@ -615,8 +616,13 @@ class Agent:
             mentioned = list(dict.fromkeys(
                 name for name in mentioned if self._path_is_existing_file(name)
             ))
-            candidates = mentioned or self._workspace_structure_candidates()
-            if len(candidates) == 1:
+            candidates = mentioned or self._workspace_structure_candidates(source_format_hint)
+            if candidates:
+                # A format-only request such as "convert xyz to lammps" names a
+                # format, not a literal file called ``xyz``. Prefer the most
+                # recently written matching structure when several are present;
+                # this is deterministic for a given workspace and avoids inventing
+                # placeholders such as ``input.xyz``.
                 source = candidates[0]
         if source is not None:
             try:
@@ -685,15 +691,39 @@ class Agent:
                     }
         return {}
 
-    def _workspace_structure_candidates(self) -> list[str]:
+    @staticmethod
+    def _source_format_hint(source: str | None) -> str | None:
+        if not source:
+            return None
+        token = source.lower().lstrip(".")
+        aliases = {
+            "xyz": ".xyz",
+            "extxyz": ".extxyz",
+            "traj": ".traj",
+            "cif": ".cif",
+            "data": ".data",
+            "lammps": ".data",
+            "lammps-data": ".data",
+        }
+        return aliases.get(token)
+
+    def _workspace_structure_candidates(self, format_hint: str | None = None) -> list[str]:
         names: list[str] = []
         supported = {"POSCAR", "CONTCAR", ".xyz", ".extxyz", ".traj", ".data", ".cif"}
         for path in self.workspace.root.rglob("*"):
             if not path.is_file() or ".git" in path.parts:
                 continue
+            if format_hint is not None and path.suffix.lower() != format_hint:
+                continue
             if path.name in supported or path.suffix.lower() in supported:
                 names.append(self.workspace.relative(path))
-        return names
+        return sorted(
+            names,
+            key=lambda name: (
+                -self.workspace.resolve(name).stat().st_mtime_ns,
+                name,
+            ),
+        )
 
     def _path_is_existing_file(self, name: str) -> bool:
         try:

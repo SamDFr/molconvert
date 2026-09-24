@@ -131,6 +131,19 @@ def test_compact_tool_schemas_use_portable_json_schema(tmp_path) -> None:
     )
 
 
+def test_compact_intent_resolves_format_name_to_existing_file(tmp_path) -> None:
+    (tmp_path / "POSCAR.xyz").write_text("first", encoding="utf-8")
+    (tmp_path / "POSCAR_1.xyz").write_text("second", encoding="utf-8")
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")
+    state = AgentState(objective="convert xyz to lammps")
+
+    intent = agent._compact_expected_arguments(state, "convert_structure")
+
+    assert intent["source"] in {"POSCAR.xyz", "POSCAR_1.xyz"}
+    assert intent["target_format"] == "lammps-data"
+    assert intent["destination"].endswith(".data")
+
+
 def test_llm_intent_mode_rewrites_before_agent_loop(tmp_path) -> None:
     from molsim_agent.agent.intent import rewrite_objective
 
