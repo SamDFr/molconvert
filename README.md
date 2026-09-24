@@ -250,6 +250,39 @@ printed, committed, or shared, revoke it immediately in the provider console and
 replacement. The application sends the key only as an HTTP authorization header; it is
 not included in `AgentState`, tool observations, progress messages, or debug payloads.
 
+### Groq on macOS with Keychain
+
+For local macOS use, store the key in **Keychain Access** instead of putting it in the
+repository or `.zshrc`:
+
+1. Open **Keychain Access** with `Cmd+Space`.
+2. Create a **New Generic Password** in the `login` keychain.
+3. Use `molsim-agent-groq` as the item name, your macOS account as the account, and paste
+   the Groq key into the password field.
+4. Load it only for the current terminal session:
+
+```bash
+export GROQ_API_KEY="$(security find-generic-password \
+  -a "$USER" -s "molsim-agent-groq" -w)"
+test -n "$GROQ_API_KEY" && echo "Groq key loaded"
+```
+
+Run the agent with a model ID shown in [Groq's supported-model list](https://console.groq.com/docs/models):
+
+```bash
+molsim-agent \
+  --provider groq \
+  --model llama-3.1-8b-instant \
+  --workspace ./simulation \
+  --profile compact
+```
+
+To change the model, keep the same key and replace only the value after `--model`, for
+example `--model llama-3.3-70b-versatile` or `--model openai/gpt-oss-20b`. You can also
+set `MOLSIM_AGENT_MODEL` instead of passing `--model`. Groq model IDs and availability
+can change, so use its model list rather than assuming an old ID remains active. Clear
+the session variable when finished with `unset GROQ_API_KEY`.
+
 ## First example
 
 Place a `POSCAR` in a workspace, launch the CLI, and ask:
