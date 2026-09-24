@@ -115,6 +115,21 @@ def test_greeting_does_not_send_tool_schemas(tmp_path) -> None:
     assert agent._tool_schemas_for_state(state) == []
 
 
+def test_compact_tool_schemas_use_portable_json_schema(tmp_path) -> None:
+    (tmp_path / "POSCAR").write_text("fixture", encoding="utf-8")
+    agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")
+    state = AgentState(objective="Convert POSCAR to a LAMMPS data file")
+
+    schemas = agent._tool_schemas_for_state(state)
+
+    assert schemas
+    assert all(
+        "const" not in definition
+        for schema in schemas
+        for definition in schema["function"]["parameters"].get("properties", {}).values()
+    )
+
+
 def test_llm_intent_mode_rewrites_before_agent_loop(tmp_path) -> None:
     from molsim_agent.agent.intent import rewrite_objective
 

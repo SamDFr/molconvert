@@ -431,7 +431,13 @@ class Agent:
             properties = schema["function"]["parameters"].get("properties", {})
             for name, value in expected.items():
                 if name in properties:
-                    properties[name]["const"] = value
+                    # JSON Schema ``const`` is not supported consistently by
+                    # OpenAI-compatible providers. Keep the schema portable and
+                    # enforce the exact value in _compact_argument_error().
+                    description = properties[name].get("description", "")
+                    required_note = f" Runtime-required value: {value!r}."
+                    if required_note not in description:
+                        properties[name]["description"] = description + required_note
         return selected
 
     @staticmethod
