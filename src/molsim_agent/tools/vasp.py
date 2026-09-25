@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from molsim_agent.safety.policies import Workspace
 from molsim_agent.tools.registry import ToolSpec
+from molsim_agent.science.models import ParameterValue, ScientificPlan
 
 
 def prepare_vasp_aimd_inputs(
@@ -67,6 +68,21 @@ Gamma
 """
     incar.write_text(incar_text)
     kpoints.write_text(kpoints_text)
+    plan = ScientificPlan(
+        task="VASP AIMD input preparation",
+        code="vasp",
+        parameters=[
+            ParameterValue("IBRION", 0, "default", True, "MD mode"),
+            ParameterValue("NSW", steps, "derived", True, "duration / timestep"),
+            ParameterValue("POTIM_fs", timestep_fs, "user" if timestep_fs != 1.0 else "default", True),
+            ParameterValue("temperature_K", temperature_K, "user" if temperature_K != 300.0 else "default", True),
+            ParameterValue("ISIF", 2, "default", True, "fixed cell"),
+            ParameterValue("kpoints", "Gamma 1x1x1", "default", True),
+        ],
+        missing_inputs=["POTCAR", "functional", "ENCUT", "spin", "electronic smearing", "VASP executable"],
+        warnings=["Review all defaults before production use."],
+        artifacts=[workspace.relative(incar), workspace.relative(kpoints)],
+    )
     return {
         "ok": True,
         "created_files": [workspace.relative(incar), workspace.relative(kpoints)],
@@ -78,6 +94,7 @@ Gamma
             "steps": steps,
             "ensemble": ensemble.lower(),
         },
+        "scientific_plan": plan.to_dict(),
         "warnings": [
             "INCAR and KPOINTS contain protocol defaults and require scientific review.",
             "POTCAR was not generated; provide matching licensed pseudopotentials.",

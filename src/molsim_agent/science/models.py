@@ -66,6 +66,46 @@ class CapabilityAssessment:
 
 
 @dataclass(slots=True)
+class ParameterValue:
+    """A scientific parameter with provenance instead of an unexplained literal."""
+
+    name: str
+    value: Any = None
+    source: str = "missing"  # user, default, derived, or missing
+    requires_review: bool = True
+    note: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.source not in {"user", "default", "derived", "missing"}:
+            raise ScientificSpecError("parameter source must be user, default, derived, or missing")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class ScientificPlan:
+    """Code-neutral plan separating defaults, facts, and unresolved inputs."""
+
+    task: str
+    code: str
+    parameters: list[ParameterValue] = field(default_factory=list)
+    missing_inputs: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    artifacts: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "task": self.task,
+            "code": self.code,
+            "parameters": [parameter.to_dict() for parameter in self.parameters],
+            "missing_inputs": list(self.missing_inputs),
+            "warnings": list(self.warnings),
+            "artifacts": list(self.artifacts),
+        }
+
+
+@dataclass(slots=True)
 class MDSpec:
     """A validated, backend-neutral molecular-dynamics protocol."""
 
