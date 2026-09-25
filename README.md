@@ -1,5 +1,26 @@
 # molsim-agent
 
+> A transparent scientific agent for atomistic simulation: the LLM chooses *what* to
+> do, while trusted Python/ASE tools decide *how* it is executed and validated.
+
+### Quick start
+
+```bash
+git clone https://github.com/SamDFr/molconvert.git
+cd molconvert
+python3 -m venv .venv && source .venv/bin/activate
+python -m pip install -e '.[dev]'
+ollama pull qwen3:8b
+molsim-agent -w ./simulation -m qwen3:8b
+```
+
+For a small local model use `--preset local` (the default); for simulation and trajectory
+tools use `--preset scientific`; use `--preset debug` when diagnosing tool calls.
+
+The remainder of this document explains the architecture, safety model, and extension
+points. Conversion is intentionally documented as one workflow, not as the project's
+definition.
+
 `molsim-agent` is an educational, open-source scientific agent for molecular simulation.
 It lets an LLM understand a research objective, assess the capabilities available in the
 current environment, select safe deterministic tools, validate calculations, and explain
@@ -107,7 +128,7 @@ tools rather than a second evaluator model. See the [official OpenAI guide](http
 | Use a bounded run with clear exit conditions | Maximum iterations, completion checks, repeated-failure stop, and validation gates | Implemented |
 | Start with a single agent | One orchestrator; ASE and Python validators are not hidden agents | Implemented |
 | Prefer capable models, then optimize latency/cost | Ollama and API backends are interchangeable; compact mode reduces context for small models | Partially implemented |
-| Establish an evaluation baseline | 35 deterministic and mock-LLM tests cover tools and orchestration | Partially implemented: no benchmark dashboard yet |
+| Establish an evaluation baseline | 57 deterministic and mock-LLM tests cover tools and orchestration | Partially implemented: no benchmark dashboard yet |
 | Layer guardrails and tool safeguards | Workspace sandbox, typed arguments, no shell, overwrite protection, deterministic validation | Implemented for v0.1 scope |
 | Human intervention for risky or failed work | Errors and unsupported semantics are returned to the user; no automatic destructive actions | Implemented for file scope; formal approval UI is future work |
 | Add multiple agents only when complexity demands it | No specialist/evaluator LLM is used for numeric structure checks | Deliberate design choice |
@@ -146,8 +167,8 @@ for validated simulations and provenance. MACE and UMA are optional: no large mo
 downloaded by installation, and `PotentialRegistry` reports missing dependencies clearly.
 
 The initial analysis helpers (`trajectory_summary`, pair-distance statistics, and MSD)
-are deterministic functions. Full MD execution, dynamic code generation, and model
-comparison remain intentionally staged work; see the roadmap below.
+are deterministic functions. MD execution and fixed-configuration model comparison are
+available in the full profile. Dynamic code generation remains intentionally staged.
 
 ### Scientific workflows available in this milestone
 
@@ -311,7 +332,7 @@ export MISTRAL_API_KEY="..."
 molsim-agent --provider mistral --model mistral-small-latest --workspace ./simulation
 
 export GROQ_API_KEY="..."
-molsim-agent --provider groq --model llama-3.1-8b-instant --workspace ./simulation
+molsim-agent --provider groq --model YOUR_GROQ_MODEL_ID --workspace ./simulation
 
 export ANTHROPIC_API_KEY="..."
 molsim-agent --provider anthropic --model claude-3-5-haiku-latest --workspace ./simulation
@@ -356,7 +377,7 @@ Run the agent with a model ID shown in [Groq's supported-model list](https://con
 ```bash
 molsim-agent \
   --provider groq \
-  --model llama-3.1-8b-instant \
+  --model YOUR_GROQ_MODEL_ID \
   --workspace ./simulation \
   --profile compact
 ```
@@ -567,17 +588,19 @@ python examples/live_conversion_demo.py --model granite3.3:2b \
   --keep-workspace ./demo-output
 ```
 
-Deterministic tests cover the registry/loop, Ollama request normalization, filesystem
-sandbox, overwrite policy, supported conversion paths, expected plain-XYZ loss, and the
-complete five-step milestone with a mock LLM. No test requires an Ollama server.
+Deterministic tests cover the registry/loop, workflow dispatch, Ollama request
+normalization, filesystem sandbox, overwrite policy, supported conversion paths, expected
+plain-XYZ loss, simulation specifications/tools, and the complete five-step milestone
+with a mock LLM. No test requires an Ollama server.
 
 ## Roadmap
 
-After the architecture is stable: VASP INCAR/XDATCAR/OUTCAR; LAMMPS input assistance;
-GROMACS, CP2K, and Quantum ESPRESSO; MACE/MLIP setup; workflow validation; SLURM;
-trajectory analysis; documentation RAG; OpenAI-compatible backends; MCP exposure; and
-specialist VASP/LAMMPS subagents. Semantic translations will use explicit equivalence
-taxonomies and user-confirmed assumptions rather than pretending to be file conversions.
+Next priorities: dynamic ScientificCodeAgent generation with stronger isolation; RDF and
+other trajectory observables; MACE/UMA execution integrations; comparative trajectory
+experiments; VASP INCAR/XDATCAR/OUTCAR; LAMMPS input assistance; GROMACS, CP2K, and
+Quantum ESPRESSO; SLURM; documentation RAG; MCP exposure; and specialist subagents.
+Semantic translations will use explicit equivalence taxonomies and user-confirmed
+assumptions rather than pretending to be file conversions.
 
 ## License
 
