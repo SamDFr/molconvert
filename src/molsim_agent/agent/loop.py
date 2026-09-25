@@ -24,6 +24,7 @@ from molsim_agent.tools.validate import validation_tool_specs
 from molsim_agent.tools.analysis import analysis_tool_specs
 from molsim_agent.tools.vasp import vasp_tool_specs, prepare_vasp_aimd_inputs
 from molsim_agent.tools.lammps import lammps_tool_specs
+from molsim_agent.tools.templates import DEFAULT_TEMPLATE_WORKFLOWS, TemplateWorkflow
 from molsim_agent.agent.capabilities import assess_capability
 from molsim_agent.agent.runtime import AgentRuntime
 from molsim_agent.agent.workflows import ConversionWorkflow, Workflow
@@ -101,6 +102,7 @@ class Agent(AgentRuntime):
         self.progress_level = progress_level or ("brief" if progress else "off")
         self.dry_run = dry_run
         self.intent_mode = intent_mode
+        self.template_workflows = DEFAULT_TEMPLATE_WORKFLOWS
         self.workflow: Workflow = self.workflows[-1]
         if self.progress_level not in {"off", "brief", "detailed"}:
             raise ValueError("progress_level must be off, brief, or detailed")
@@ -152,77 +154,33 @@ class Agent(AgentRuntime):
             dry_run=self.dry_run,
         )
         self.workflow = self.workflow_for(effective_objective)
-        # Capability assessment is explicit state, not an assertion hidden in a prompt.
-        # Conversion behavior remains unchanged; scientific requests get a conservative
-        # preflight that can explain missing implementation/dependencies to the model.
-        if self.workflow.name != "conversion" and re.search(
-            r"\b(?:trajectory|autocorrelation|vacf|rdf|msd|molecular dynamics|md|simulation|"
-            r"observable|aimd|vasp|incar|potcar|kpoints|k-points)\b",
-            objective,
-            re.IGNORECASE,
-        ):
+        # Scientific template workflows are selected through a registry. The runtime
+        # does not contain one branch per code; each registered handler owns its defaults.
+        template = self.template_workflows.match(objective)
+        if template is not None:
             assessment = assess_capability(
                 objective,
                 {item["name"] for item in self.registry.available_capabilities()},
             )
             state.capability_assessments.append(assessment.to_dict())
             self._emit("capability_assessment", assessment.to_dict())
-            if (
-                assessment.status == "needs_user_input"
-                and "validated_vasp_workflow_builder" == assessment.missing_capability
-            ):
-                # The protocol-level files are safely determinable, so write them with
-                # explicit review comments. POTCAR/electronic choices remain untouched.
-                call = ToolCall("vasp-preflight", "prepare_vasp_aimd_inputs", {"source": "POSCAR"})
-                self._emit("tool_call", {"name": call.name, "arguments": call.arguments})
-                try:
-                    result = self.registry.execute(call.name, call.arguments)
-                    observation = {"ok": True, "result": result}
-                    state.created_files.extend(result.get("created_files", []))
-                    state.warnings.extend(result.get("warnings", []))
-                    state.phase = "inputs_prepared"
-                    state.tool_executions.append(ToolExecution(call=call, result=observation))
-                    self._emit("tool_result", {"name": call.name, "observation": observation})
-                    state.final_answer = (
-                        "Prepared VASP AIMD defaults for 300 K and 1 ps:\n"
-                        f"- created: {', '.join(result['created_files'])}\n"
-                        "- defaults: IBRION=0, NSW=1000, POTIM=1 fs, fixed cell (ISIF=2), "
-                        "Gamma-point KPOINTS\n"
-                        "- review required: POTCAR, functional, ENCUT, spin, smearing, "
-                        "thermostat/ensemble, and VASP availability\n"
-                        "These files are a starting template, not a validated production setup."
-                    )
-                except Exception as exc:
-                    observation = {"ok": False, "error": type(exc).__name__, "message": str(exc)}
-                    state.tool_executions.append(ToolExecution(call=call, result=observation))
-                    state.final_answer = (
-                        "I could not prepare the VASP defaults safely: " + str(exc)
-                    )
-                self._emit("capability_blocked", assessment.to_dict())
-                return state
-            if assessment.missing_capability == "validated_lammps_workflow_builder":
-                call = ToolCall("lammps-preflight", "prepare_lammps_md_inputs", {"source": "POSCAR"})
-                self._emit("tool_call", {"name": call.name, "arguments": call.arguments})
-                try:
-                    result = self.registry.execute(call.name, call.arguments)
-                    observation = {"ok": True, "result": result}
-                    state.created_files.extend(result.get("created_files", []))
-                    state.warnings.extend(result.get("warnings", []))
-                    state.tool_executions.append(ToolExecution(call=call, result=observation))
-                    self._emit("tool_result", {"name": call.name, "observation": observation})
-                    state.final_answer = (
-                        "Prepared a LAMMPS MD template for 300 K and 1 ps:\n"
-                        f"- created: {', '.join(result.get('created_files', []))}\n"
-                        "- defaults: metal units, 1 fs timestep, 1000 steps, periodic boundaries, NVT\n"
-                        "- review required: pair_style, pair_coeff, force-field/ML potential, masses, and LAMMPS executable\n"
-                        "The input contains explicit __REQUIRED__ placeholders and must not be run before they are replaced."
-                    )
-                except Exception as exc:
-                    observation = {"ok": False, "error": type(exc).__name__, "message": str(exc)}
-                    state.tool_executions.append(ToolExecution(call=call, result=observation))
-                    state.final_answer = "I could not prepare the LAMMPS template safely: " + str(exc)
-                self._emit("capability_blocked", assessment.to_dict())
-                return state
+            call = ToolCall(f"template-{template.name}", template.tool_name, {"source": "POSCAR"})
+            self._emit("tool_call", {"name": call.name, "arguments": call.arguments})
+            try:
+                result = self.template_workflows.execute(template, self.registry, "POSCAR")
+                observation = {"ok": True, "result": result}
+                state.created_files.extend(result.get("created_files", []))
+                state.warnings.extend(result.get("warnings", []))
+                state.phase = "inputs_prepared"
+                state.tool_executions.append(ToolExecution(call=call, result=observation))
+                self._emit("tool_result", {"name": call.name, "observation": observation})
+                state.final_answer = self._template_report(template, result)
+            except Exception as exc:
+                observation = {"ok": False, "error": type(exc).__name__, "message": str(exc)}
+                state.tool_executions.append(ToolExecution(call=call, result=observation))
+                state.final_answer = f"I could not prepare the {template.description} safely: {exc}"
+            self._emit("capability_blocked", assessment.to_dict())
+            return state
         if self.intent_mode == "deterministic":
             intent = (
                 self._compact_expected_arguments(state, "convert_structure")
@@ -432,6 +390,24 @@ class Agent(AgentRuntime):
     def _emit(self, event: str, payload: dict[str, Any]) -> None:
         if self.event_handler is not None:
             self.event_handler(event, payload)
+
+    @staticmethod
+    def _template_report(template: TemplateWorkflow, result: dict[str, Any]) -> str:
+        plan = result.get("scientific_plan", {})
+        created = ", ".join(result.get("created_files", [])) or "no files"
+        defaults = [
+            f"{item.get('name')}={item.get('value')}"
+            for item in plan.get("parameters", [])
+            if item.get("source") in {"default", "derived"}
+        ]
+        missing = ", ".join(plan.get("missing_inputs", [])) or "none reported"
+        return (
+            f"Prepared {template.description}.\n"
+            f"- created: {created}\n"
+            f"- defaults/derived: {', '.join(defaults) or 'none'}\n"
+            f"- review required: {missing}\n"
+            "The generated files are templates and must be reviewed before production use."
+        )
 
     @staticmethod
     def _resolve_profile(profile: str, backend: LLMBackend) -> str:
