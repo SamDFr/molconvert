@@ -275,6 +275,11 @@ compact deterministic workflow:
 molsim-agent -w ./simulation -m qwen3:8b
 ```
 
+This command uses **Ollama locally by default** (`--provider ollama`). No API key is
+required. The startup banner prints the active provider, model, workspace, and preset so
+there is no ambiguity. Use `--provider groq`, `--provider openai`, `--provider mistral`,
+or `--provider anthropic` when you intentionally want a hosted backend.
+
 Then type requests at the `>` prompt, or provide one directly:
 
 ```bash
@@ -293,7 +298,7 @@ molsim-agent -w ./simulation -m qwen3:8b --preset debug
 ```
 
 The equivalent environment variables are `MOLSIM_AGENT_MODEL`,
-`MOLSIM_AGENT_PROVIDER`, and `MOLSIM_AGENT_WORKSPACE`. Advanced flags such as
+`MOLSIM_AGENT_PROVIDER` (default `ollama`), and `MOLSIM_AGENT_WORKSPACE`. Advanced flags such as
 `--profile`, `--intent-mode`, `--progress-level`, `--timeout`, and `--verbose` remain
 available when you need precise control.
 

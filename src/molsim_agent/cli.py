@@ -40,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--provider",
         choices=("ollama", "openai", "mistral", "groq", "anthropic"),
         default=os.environ.get("MOLSIM_AGENT_PROVIDER", "ollama"),
+        help="LLM provider (default: ollama; override with MOLSIM_AGENT_PROVIDER)",
     )
     parser.add_argument("--base-url", help="Optional API base URL for OpenAI-compatible providers")
     parser.add_argument("--api-key", help="API key (prefer OPENAI_API_KEY, MISTRAL_API_KEY, or ANTHROPIC_API_KEY)")
@@ -247,8 +248,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     print("Molecular Simulation Agent")
     print("Hello! I can plan scientific workflows, inspect trajectories, run validated calculations, and convert structure files when needed.")
+    print(f"Provider: {args.provider}")
     print(f"Model: {args.model}")
     print(f"Workspace: {workspace}")
+    print(f"Preset: {args.preset}")
     if args.dry_run:
         print("Mode: dry run (no files will be written)")
 
