@@ -245,6 +245,37 @@ pytest
 
 ASE is the only runtime Python dependency. Pytest is optional development tooling.
 
+## Simple command-line usage
+
+Most users only need a workspace and a model. The default `local` preset selects the
+compact deterministic workflow:
+
+```bash
+molsim-agent -w ./simulation -m qwen3:8b
+```
+
+Then type requests at the `>` prompt, or provide one directly:
+
+```bash
+molsim-agent -w ./simulation -m qwen3:8b \
+  "Convert POSCAR to extended XYZ and validate it"
+```
+
+Use a preset instead of repeating several flags:
+
+```bash
+# Full scientific tool registry and LLM intent normalization
+molsim-agent -w ./simulation -m qwen3:8b --preset scientific
+
+# Detailed model/tool diagnostics
+molsim-agent -w ./simulation -m qwen3:8b --preset debug
+```
+
+The equivalent environment variables are `MOLSIM_AGENT_MODEL`,
+`MOLSIM_AGENT_PROVIDER`, and `MOLSIM_AGENT_WORKSPACE`. Advanced flags such as
+`--profile`, `--intent-mode`, `--progress-level`, `--timeout`, and `--verbose` remain
+available when you need precise control.
+
 ## Ollama setup
 
 Install [Ollama](https://ollama.com/), start it, and obtain a model that reliably emits

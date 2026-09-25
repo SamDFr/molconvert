@@ -28,9 +28,10 @@ def build_parser() -> argparse.ArgumentParser:
         prog="molsim-agent",
         description="A scientific molecular-simulation agent with deterministic tools",
     )
-    parser.add_argument("--workspace", default=".", help="Allowed filesystem workspace")
+    parser.add_argument("-w", "--workspace", default=os.environ.get("MOLSIM_AGENT_WORKSPACE", "."), help="Allowed filesystem workspace")
     parser.add_argument(
         "--model",
+        "-m",
         default=os.environ.get("MOLSIM_AGENT_MODEL"),
         help="Ollama model name (or set MOLSIM_AGENT_MODEL)",
     )
@@ -38,26 +39,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--provider",
         choices=("ollama", "openai", "mistral", "groq", "anthropic"),
-        default="ollama",
+        default=os.environ.get("MOLSIM_AGENT_PROVIDER", "ollama"),
     )
     parser.add_argument("--base-url", help="Optional API base URL for OpenAI-compatible providers")
     parser.add_argument("--api-key", help="API key (prefer OPENAI_API_KEY, MISTRAL_API_KEY, or ANTHROPIC_API_KEY)")
     parser.add_argument(
         "--profile",
         choices=("full", "compact", "auto"),
-        default="auto",
+        default=None,
         help="Model context profile; auto selects compact for Ollama and full otherwise",
     )
     parser.add_argument(
         "--intent-mode",
         choices=("deterministic", "llm"),
-        default="deterministic",
+        default=None,
         help="Normalize free-form requests deterministically (default) or with one extra LLM call",
     )
     parser.add_argument(
         "--timeout",
         type=float,
-        default=120.0,
+        default=None,
         help="Seconds allowed for each Ollama response",
     )
     parser.add_argument(
@@ -73,6 +74,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum LLM/tool loop iterations (default: 20)",
     )
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument(
+        "--preset",
+        choices=("local", "scientific", "debug"),
+        default="local",
+        help="Short configuration: local (small model), scientific (full tools), or debug.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Plan and inspect without writing files")
     parser.add_argument(
         "--progress",
@@ -201,6 +208,15 @@ class ConsoleEvents:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    preset = {
+        "local": {"profile": "compact", "intent_mode": "deterministic", "timeout": 120.0, "progress_level": "off"},
+        "scientific": {"profile": "full", "intent_mode": "llm", "timeout": 300.0, "progress_level": "brief"},
+        "debug": {"profile": "full", "intent_mode": "deterministic", "timeout": 300.0, "progress_level": "detailed"},
+    }[args.preset]
+    args.profile = args.profile or preset["profile"]
+    args.intent_mode = args.intent_mode or preset["intent_mode"]
+    args.timeout = args.timeout or preset["timeout"]
+    args.progress_level = args.progress_level or preset["progress_level"]
     if not args.model:
         print("Error: provide --model or set MOLSIM_AGENT_MODEL")
         return 2
