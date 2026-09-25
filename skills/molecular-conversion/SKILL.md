@@ -1,19 +1,24 @@
-# Molecular Structure Conversion
+# Molecular Structure Conversion and Scientific Orchestrator
 
 ## Purpose
 
-Inspect and convert atomistic structure files with deterministic tools while making
-preservation, loss, and uncertainty explicit.
+Plan and execute molecular-simulation workflows with an LLM orchestrator and trusted
+deterministic tools. Structure conversion is one workflow, not the default meaning of
+every scientific request.
 
 ## Supported tasks
 
 - Inspect VASP POSCAR/CONTCAR, XYZ/extXYZ, CIF, ASE `.traj`, and LAMMPS data structures.
 - Convert structures among those formats using `convert_structure`.
 - Validate a converted structure against its source using `validate_conversion`.
-- Search for batches of supported files and create output directories.
+- Prepare conservative VASP AIMD and LAMMPS MD templates with explicit defaults and
+  missing-input reports.
+- Run validated single-point, optimization, bounded MD, and baseline analysis tools when
+  the required dependencies and calculators are available.
+- Assess capabilities before claiming that an observable or workflow was executed.
 
-Workflow/script translation (for example, INCAR to a LAMMPS input) is semantic
-translation, not structure conversion, and is outside v0.1.
+Workflow/script translation is semantic scientific planning, not structure conversion.
+Use a registered workflow template or simulation specification and report assumptions.
 
 ## Scientific rules
 
@@ -26,8 +31,26 @@ translation, not structure conversion, and is outside v0.1.
   controls have no direct classical-MD equivalents.
 - Say whether information is preserved, approximated, discarded, requires user input,
   or has no meaningful equivalent.
+- Separate parameter provenance: `user`, `default`, `derived`, and `missing`.
+- Use standard defaults only when they are appropriate for the selected code and label
+  them as reviewable assumptions.
+- Never invent a force field, ML potential, pseudopotential, or executable setting.
 
-## Conversion policy
+## Scientific planning policy
+
+1. Identify the scientific objective and requested code/calculation.
+2. Assess capability: available, needs implementation, needs dependency, needs external
+   data, needs compute, needs user input, or unsupported.
+3. Build a structured scientific plan before writing files or running calculations.
+4. Keep defaults and derived values explicit, with units and review warnings.
+5. Execute only through a registered deterministic tool and record provenance.
+6. Interpret only observations returned by tools. Never claim a calculation ran otherwise.
+
+For uncertain parameters, consult an approved documentation/literature tool when one is
+available. A source does not automatically become an executable parameter; the result
+still requires compatibility and scientific validation.
+
+## Structure conversion policy
 
 1. Locate and detect the requested source file.
 2. Inspect it before conversion.

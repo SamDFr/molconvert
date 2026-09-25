@@ -524,6 +524,12 @@ It defines supported work, the no-guessing policy, and the preferred inspect →
 validate flow. Pass `skill_paths=[...]` to `Agent` to experiment with other instruction
 files. Skills guide planning; they do not bypass tool or safety enforcement.
 
+The repository also includes an explanatory slide deck:
+[`docs/molsim-agent-overview.pdf`](docs/molsim-agent-overview.pdf) and its editable
+source [`docs/molsim-agent-overview.tex`](docs/molsim-agent-overview.tex). Update the
+source when adding a major workflow, tool category, safety rule, or capability status,
+then rebuild it with `pdflatex`.
+
 ## Safety model
 
 - Every tool resolves paths against one canonical workspace; `..`, absolute paths, and

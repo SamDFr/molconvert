@@ -1,0 +1,188 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{default}
+\usecolortheme{dove}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{listings}
+\definecolor{navy}{RGB}{20,39,53}
+\definecolor{blue}{RGB}{40,94,142}
+\definecolor{green}{RGB}{42,120,90}
+\setbeamercolor{title}{fg=navy}
+\setbeamercolor{frametitle}{fg=navy}
+\setbeamercolor{structure}{fg=blue}
+\setbeamertemplate{navigation symbols}{}
+\lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,columns=fullflexible,keywordstyle=\color{blue}}
+
+\title{molsim-agent}
+\subtitle{A transparent scientific agent for molecular simulation}
+\author{Open-source research project}
+\date{\today}
+
+\begin{document}
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Project purpose}
+\begin{itemize}
+  \item The LLM interprets a scientific objective and chooses the next action.
+  \item Trusted Python and ASE tools perform parsing, simulation, analysis, and validation.
+  \item The runtime records observations, assumptions, artifacts, and provenance.
+  \item Structure conversion is one workflow among several.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{What makes this an agent?}
+\begin{enumerate}
+  \item Receive an objective and current state.
+  \item Expose a bounded set of typed tools.
+  \item Let the model request a tool or finish.
+  \item Execute the request after validation.
+  \item Return the observation to the model.
+  \item Stop after a validated result, failure, or iteration limit.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{The explicit loop}
+\begin{center}
+\Large User objective $\rightarrow$ LLM $\rightarrow$ tool call $\rightarrow$ Python tool\\[0.4em]
+Observation $\rightarrow$ state update $\rightarrow$ LLM\\[0.4em]
+\textbf{Final scientific report}
+\end{center}
+\vspace{0.5em}
+The runtime never treats plausible text as evidence. A successful tool observation is the
+boundary between a plan and an executed calculation.
+\end{frame}
+
+\begin{frame}{Scientific orchestrator}
+\begin{itemize}
+  \item Understand the requested quantity, code, method, and constraints.
+  \item Decide which workflow and tools are needed.
+  \item Assess capabilities before claiming execution.
+  \item Identify defaults, derived parameters, missing inputs, and risks.
+  \item Interpret deterministic results without fabricating numbers.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Capability assessment}
+\begin{block}{Structured status}
+available, needs\_implementation, needs\_dependency, needs\_external\_data,
+needs\_compute, needs\_user\_input, unsupported
+\end{block}
+\begin{exampleblock}{Example}
+The agent understands an orientational autocorrelation request, but no trusted tool is
+registered. It can propose implementation with NumPy/MDAnalysis instead of pretending
+that the observable was computed.
+\end{exampleblock}
+\end{frame}
+
+\begin{frame}{Workflow registry}
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Workflow & Tool & Responsibility\\
+\midrule
+Conversion & \texttt{convert\_structure} & ASE I/O and validation\\
+Simulation & \texttt{run\_md} & Bounded ASE protocol\\
+Analysis & \texttt{mean\_squared\_displacement} & Deterministic observable\\
+Template & \texttt{prepare\_*\_inputs} & Defaults plus missing inputs\\
+\bottomrule
+\end{tabular}
+\end{center}
+The orchestrator uses a registry contract instead of a growing code-specific branch in
+the central loop.
+\end{frame}
+
+\begin{frame}{Scientific plans and parameter provenance}
+Every generated protocol can label each parameter as:
+\begin{itemize}
+  \item \texttt{user}: supplied explicitly;
+  \item \texttt{derived}: calculated from the request;
+  \item \texttt{default}: standard starting assumption;
+  \item \texttt{missing}: requires evidence or user input.
+\end{itemize}
+This makes a template inspectable before it becomes a production calculation.
+\end{frame}
+
+\begin{frame}{Example: VASP AIMD}
+\begin{itemize}
+  \item Generated: \texttt{INCAR} and Gamma-point \texttt{KPOINTS}.
+  \item Derived: 1 ps / 1 fs $=$ 1000 steps.
+  \item Default: fixed cell and standard MD mode.
+  \item Missing: POTCAR, functional, ENCUT, spin, smearing, convergence, executable.
+\end{itemize}
+\begin{alertblock}{Safety rule}
+The agent writes a reviewable template, not a claim that the production setup is valid.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Example: LAMMPS MD}
+\begin{itemize}
+  \item Generated: deterministic structure data and \texttt{in.molsim}.
+  \item Default: metal units, 1 fs timestep, 1000 steps, NVT protocol.
+  \item Explicit placeholders: \texttt{pair\_style} and \texttt{pair\_coeff}.
+  \item Missing: force field or ML potential, masses, validated coefficients, executable.
+\end{itemize}
+The POSCAR does not contain enough information to choose a classical potential.
+\end{frame}
+
+\begin{frame}{Deterministic scientific tools}
+\begin{itemize}
+  \item ASE reads and writes structures.
+  \item ASE calculators execute single-point, optimization, and bounded MD workflows.
+  \item Analysis tools compute trajectory summaries, distances, and MSD.
+  \item Validation compares atom count, symbols, positions, cell, PBC, and optional data.
+  \item Experiment records store hashes, parameters, outputs, warnings, and versions.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Safety boundaries}
+\begin{itemize}
+  \item All paths stay inside one workspace.
+  \item Existing files are protected by default.
+  \item No arbitrary shell execution.
+  \item Generated code stays outside trusted \texttt{src/}.
+  \item A tool failure is an observation, not a successful result.
+  \item Unsupported scientific mappings are reported explicitly.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Small-model and full profiles}
+\begin{itemize}
+  \item \texttt{local}: compact deterministic routing for Ollama and small models.
+  \item \texttt{scientific}: full tool registry and LLM-assisted planning.
+  \item \texttt{debug}: detailed requests, tool calls, observations, and timing.
+\end{itemize}
+\begin{block}{Typical commands}
+\texttt{molsim-agent -w ./simulation -m qwen3:8b}\\
+\texttt{molsim-agent -w ./simulation -m qwen3:8b --preset scientific}
+\end{block}
+\end{frame}
+
+\begin{frame}{Adding a new scientific code}
+\begin{enumerate}
+  \item Define a structured specification.
+  \item Register a workflow and its deterministic tool.
+  \item Declare dependencies, cost, risk, and determinism.
+  \item Label defaults and missing inputs.
+  \item Add tests with a lightweight calculator or test double.
+  \item Update the skill and this presentation.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Current status and roadmap}
+\textbf{Implemented:} explicit loop, registry, capabilities, ASE simulation tools,
+templates, analysis, provenance, safety, Ollama and hosted backends.\\[0.5em]
+\textbf{Next:} literature/documentation retrieval, RDF, stronger generated-code isolation,
+MACE/UMA execution, comparative experiments, and additional simulation codes.
+\end{frame}
+
+\begin{frame}{Key design principle}
+\begin{center}
+\Large The LLM decides what should happen.\\[0.5em]
+Trusted scientific software decides how it happens.\\[0.5em]
+Validation decides whether the result can be trusted.
+\end{center}
+\end{frame}
+\end{document}
