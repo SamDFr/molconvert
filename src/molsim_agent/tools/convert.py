@@ -39,10 +39,12 @@ def convert_structure(
         destination_path = _next_available_destination(destination_path)
         destination_adjusted = True
     existed_before = destination_path.exists()
+    directory_created = False
     if not destination_path.parent.is_dir():
-        raise FileNotFoundError(
-            f"Destination directory does not exist: {workspace.relative(destination_path.parent)}"
-        )
+        # Creating a missing destination directory is a safe, reversible workspace
+        # operation. The workspace boundary was already checked by resolve().
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        directory_created = True
 
     atoms, source_format, read_warnings = read_structure(source_path)
     normalized_target = normalize_format(target_format)
@@ -52,6 +54,10 @@ def convert_structure(
         warnings.append(
             f"Requested destination {requested_destination} already existed; wrote a new file "
             f"at {workspace.relative(destination_path)} instead."
+        )
+    if directory_created:
+        warnings.append(
+            f"Created destination directory {workspace.relative(destination_path.parent)}."
         )
     limitations = FORMAT_LIMITATIONS[normalized_target]
     present = _present_properties(atoms)

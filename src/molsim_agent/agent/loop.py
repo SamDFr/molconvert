@@ -428,11 +428,6 @@ class Agent(AgentRuntime):
 
     def _execute_scientific_plan(self, state: AgentState, plan: ScientificTaskPlan) -> bool:
         """Validate and execute an LLM plan; return False so the normal loop can fall back."""
-        try:
-            for step in plan.steps:
-                self.registry.validate(step.tool, step.arguments)
-        except (KeyError, TypeError, ValueError):
-            return False
         state.plan = {
             "objective": plan.objective,
             "steps": [{"tool": step.tool, "arguments": step.arguments, "purpose": step.purpose} for step in plan.steps],
@@ -441,18 +436,20 @@ class Agent(AgentRuntime):
         }
         observations: list[dict[str, Any]] = []
         for index, step in enumerate(plan.steps, start=1):
-            call = ToolCall(f"plan-{index}", step.tool, step.arguments)
+            arguments = self._resolve_plan_arguments(step.arguments, observations)
+            call = ToolCall(f"plan-{index}", step.tool, arguments)
             purpose = step.purpose or f"Executing {step.tool}"
             self._emit("progress_message", {"message": purpose})
-            self._emit("tool_call", {"name": step.tool, "arguments": step.arguments})
+            self._emit("tool_call", {"name": step.tool, "arguments": arguments})
             try:
                 spec = self.registry.get(step.tool)
+                self.registry.validate(step.tool, arguments)
                 if self.dry_run and spec.risk == "write":
                     result = {"ok": True, "dry_run": True, "planned_tool": step.tool,
-                              "planned_arguments": step.arguments,
+                              "planned_arguments": arguments,
                               "warnings": ["Dry run: no files were written."]}
                 else:
-                    result = self.registry.execute(step.tool, step.arguments)
+                    result = self.registry.execute(step.tool, arguments)
                 observation = {"ok": True, "result": result}
                 state.created_files.extend(result.get("created_files", []))
                 state.modified_files.extend(result.get("modified_files", []))
@@ -477,10 +474,70 @@ class Agent(AgentRuntime):
         ]
         try:
             response = self.backend.chat(report_messages, [])
-            state.final_answer = response.content.strip() or "The requested plan completed; see the tool observations."
+            state.final_answer = response.content.strip() or self._fallback_plan_report(plan, observations)
         except Exception:
-            state.final_answer = "The requested plan completed; see the tool observations."
+            state.final_answer = self._fallback_plan_report(plan, observations)
         return True
+
+    def _resolve_plan_arguments(self, value: Any, observations: list[dict[str, Any]]) -> Any:
+        """Resolve model placeholders and discovered paths between ordered plan steps."""
+        matches: list[str] = []
+        for item in observations:
+            if item.get("tool") != "find_files":
+                continue
+            result = item.get("observation", {}).get("result", {})
+            if isinstance(result, dict):
+                matches.extend(str(match) for match in result.get("matches", []))
+
+        def resolve(item: Any, key: str = "") -> Any:
+            if isinstance(item, dict):
+                return {name: resolve(child, name) for name, child in item.items()}
+            if isinstance(item, list):
+                return [resolve(child, key) for child in item]
+            if not isinstance(item, str) or not matches:
+                return item
+            if "<" in item and ">" in item:
+                preferred = [match for match in matches if "poscar" in item.lower() and "poscar" in match.lower()]
+                return (preferred or matches)[0]
+            if key in {"path", "source", "destination"}:
+                try:
+                    if not self.workspace.resolve(item).exists():
+                        same_name = [match for match in matches if Path(match).name == Path(item).name]
+                        if len(same_name) == 1:
+                            return same_name[0]
+                except Exception:
+                    pass
+            return item
+
+        return resolve(value)
+
+    @staticmethod
+    def _fallback_plan_report(plan: ScientificTaskPlan, observations: list[dict[str, Any]]) -> str:
+        """Produce useful evidence-based output when the final model response is empty."""
+        lines = ["Scientific task completed from the executed tool observations."]
+        for item in observations:
+            observation = item.get("observation", {})
+            if not observation.get("ok"):
+                lines.append(f"- {item.get('tool')}: failed ({observation.get('message', 'unknown error')})")
+                continue
+            result = observation.get("result", {})
+            structure = result.get("structure", {}) if isinstance(result, dict) else {}
+            if structure:
+                lines.append(
+                    f"- structure: {structure.get('atom_count', '?')} atoms; "
+                    f"species={structure.get('species_counts', {})}; "
+                    f"PBC={structure.get('pbc', '?')}; "
+                    f"cell={structure.get('cell_angstrom', 'not reported')}"
+                )
+            elif isinstance(result, dict) and result.get("created_files"):
+                lines.append(f"- {item.get('tool')}: created {', '.join(result['created_files'])}")
+            else:
+                lines.append(f"- {item.get('tool')}: completed")
+        if plan.assumptions:
+            lines.append("Assumptions: " + "; ".join(plan.assumptions))
+        if plan.missing_inputs:
+            lines.append("Missing or unresolved inputs: " + "; ".join(plan.missing_inputs))
+        return "\n".join(lines)
 
     @staticmethod
     def _template_report(template: TemplateWorkflow, result: dict[str, Any], analysis: dict[str, Any] | None = None) -> str:

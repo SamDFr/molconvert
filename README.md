@@ -231,7 +231,8 @@ ordered structured plan, which the runtime validates before executing. This allo
 single request to combine inspection, preparation, conversion, validation, and reporting
 without adding a new hard-coded branch for every wording or user workflow. If the planner
 cannot return a valid plan, the explicit tool-calling loop remains available as a safe
-fallback.
+fallback. Results from discovery steps such as `find_files` are resolved into later tool
+arguments, so a model placeholder cannot be passed literally to a scientific tool.
 
 ### Execution profiles
 

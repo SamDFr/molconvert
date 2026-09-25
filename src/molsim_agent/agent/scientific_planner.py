@@ -50,7 +50,11 @@ def plan_task(
                 "available_tools. Use explicit user values; otherwise omit arguments so "
                 "trusted tools can apply documented defaults. Never invent coordinates, "
                 "force fields, charges, units, files, or scientific results. Include an "
-                "inspection step before modifying or simulating a structure when relevant."
+                "inspection step before modifying or simulating a structure when relevant. "
+                "Do not substitute a molecular-dynamics template for geometry optimization, "
+                "energy calculation, analysis, or another different scientific task. If no "
+                "registered tool matches a requested subtask, return no step for that subtask "
+                "and explain it in missing_inputs."
             ),
         ),
         Message(role="user", content=json.dumps(prompt, ensure_ascii=False)),
@@ -71,10 +75,10 @@ def plan_task(
         if not isinstance(arguments, dict):
             return None
         steps.append(PlanStep(item["tool"], arguments, str(item.get("purpose", ""))))
-    if not steps or len(steps) > 20:
-        return None
     missing = data.get("missing_inputs", [])
     assumptions = data.get("assumptions", [])
+    if len(steps) > 20 or (not steps and not missing):
+        return None
     return ScientificTaskPlan(
         objective=str(data.get("objective") or objective),
         steps=tuple(steps),

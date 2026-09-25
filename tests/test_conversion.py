@@ -103,3 +103,9 @@ def test_conversion_chooses_new_name_without_overwriting(workspace: Workspace) -
 def test_conversion_cannot_write_outside_workspace(workspace: Workspace) -> None:
     with pytest.raises(ValueError, match="outside"):
         convert_structure(workspace, "POSCAR", "../escaped.xyz", "extxyz")
+
+
+def test_conversion_creates_missing_workspace_subdirectory(workspace: Workspace) -> None:
+    result = convert_structure(workspace, "POSCAR", "convert_output/structure.xyz", "extxyz")
+    assert (workspace.root / "convert_output" / "structure.xyz").is_file()
+    assert any("Created destination directory" in warning for warning in result["warnings"])

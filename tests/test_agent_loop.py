@@ -214,6 +214,35 @@ def test_template_workflow_dry_run_does_not_write_outputs(tmp_path) -> None:
     assert "dry run" in (state.final_answer or "").lower()
 
 
+def test_llm_plan_has_evidence_based_fallback_report_when_final_is_empty(tmp_path) -> None:
+    from shutil import copyfile
+    copyfile(Path(__file__).parent / "fixtures" / "POSCAR", tmp_path / "POSCAR")
+    plan = {"objective": "analyze POSCAR", "steps": [
+        {"tool": "inspect_structure", "arguments": {"path": "POSCAR"}, "purpose": "Inspect"}
+    ], "missing_inputs": [], "assumptions": []}
+    backend = MockBackend([LLMResponse(content=json.dumps(plan)), LLMResponse(content="")])
+    state = Agent(backend=backend, workspace=tmp_path, profile="full", intent_mode="llm").run(
+        "Analyze POSCAR and prepare a report"
+    )
+    assert "2 atoms" in (state.final_answer or "")
+    assert "species" in (state.final_answer or "")
+
+
+def test_llm_plan_resolves_file_placeholder_from_find_files(tmp_path) -> None:
+    from shutil import copyfile
+    copyfile(Path(__file__).parent / "fixtures" / "POSCAR", tmp_path / "POSCAR")
+    plan = {"objective": "find and inspect POSCAR", "steps": [
+        {"tool": "find_files", "arguments": {"pattern": "POSCAR", "path": "."}},
+        {"tool": "inspect_structure", "arguments": {"path": "<path_to_POSCAR>"}},
+    ], "missing_inputs": [], "assumptions": []}
+    backend = MockBackend([LLMResponse(content=json.dumps(plan)), LLMResponse(content="Inspected.")])
+    state = Agent(backend=backend, workspace=tmp_path, profile="full", intent_mode="llm").run(
+        "Find the POSCAR and inspect it"
+    )
+    assert state.final_answer == "Inspected."
+    assert state.tool_executions[1].call.arguments["path"] == "POSCAR"
+
+
 def test_progress_mode_requests_brief_model_status(tmp_path) -> None:
     backend = MockBackend([LLMResponse(content="Done")])
     agent = Agent(backend=backend, workspace=tmp_path, profile="compact", progress=True)
