@@ -179,6 +179,14 @@ logs, and an `experiment.json` provenance record. The built-in EMT calculator is
 for tests and demonstrations; MACE and UMA are discovered only when their optional
 dependencies are installed.
 
+For a request such as “prepare VASP inputs for AIMD at 300 K for 1 ps”, the agent can
+write a conservative `INCAR` and Gamma-point `KPOINTS` template. It uses explicit
+protocol defaults (`IBRION=0`, `NSW`, `POTIM`, `TEBEG/TEEND`, fixed-cell `ISIF=2`) and
+places review comments in `INCAR`. It never fabricates or writes `POTCAR`, `ENCUT`, a
+functional, spin settings, or electronic smearing. The final report lists every default
+that must be reviewed before production use, and existing inputs are protected unless
+overwrite is explicitly authorized.
+
 Examples:
 
 ```text

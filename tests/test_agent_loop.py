@@ -104,6 +104,7 @@ def test_auto_profile_uses_compact_context_for_ollama(tmp_path) -> None:
         "inspect_structure",
         "convert_structure",
         "validate_conversion",
+        "prepare_vasp_aimd_inputs",
     }
     assert "Compact Molecular Conversion" in agent.system_prompt
 
@@ -117,6 +118,8 @@ def test_greeting_does_not_send_tool_schemas(tmp_path) -> None:
 
 
 def test_vasp_aimd_request_is_gated_without_inventing_inputs(tmp_path) -> None:
+    from shutil import copyfile
+    copyfile(Path(__file__).parent / "fixtures" / "POSCAR", tmp_path / "POSCAR")
     backend = MockBackend([])
     state = Agent(backend=backend, workspace=tmp_path).run(
         "Prepare VASP inputs for AIMD at 300K for 1ps from the POSCAR file"
@@ -125,6 +128,8 @@ def test_vasp_aimd_request_is_gated_without_inventing_inputs(tmp_path) -> None:
     assert "IBRION=0" in state.final_answer
     assert "POTCAR" in state.final_answer
     assert state.capability_assessments[0]["status"] == "needs_user_input"
+    assert (tmp_path / "INCAR").exists()
+    assert (tmp_path / "KPOINTS").exists()
 
 
 def test_compact_tool_schemas_use_portable_json_schema(tmp_path) -> None:

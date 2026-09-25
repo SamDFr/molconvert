@@ -22,6 +22,7 @@ from molsim_agent.tools.inspect import inspection_tool_specs
 from molsim_agent.tools.registry import ToolRegistry
 from molsim_agent.tools.validate import validation_tool_specs
 from molsim_agent.tools.analysis import analysis_tool_specs
+from molsim_agent.tools.vasp import vasp_tool_specs, prepare_vasp_aimd_inputs
 from molsim_agent.agent.capabilities import assess_capability
 from molsim_agent.agent.runtime import AgentRuntime
 from molsim_agent.agent.workflows import ConversionWorkflow, Workflow
@@ -110,6 +111,7 @@ class Agent(AgentRuntime):
                 inspection_tool_specs(self.workspace, include_coordinates=False),
                 conversion_tool_specs(self.workspace),
                 validation_tool_specs(self.workspace),
+                vasp_tool_specs(self.workspace),
             )
         else:
             tool_groups = (
@@ -119,6 +121,7 @@ class Agent(AgentRuntime):
                 validation_tool_specs(self.workspace),
                 analysis_tool_specs(self.workspace),
                 simulation_tool_specs(self.workspace),
+                vasp_tool_specs(self.workspace),
             )
         for group in tool_groups:
             for tool in group:
@@ -165,18 +168,33 @@ class Agent(AgentRuntime):
                 assessment.status == "needs_user_input"
                 and "validated_vasp_workflow_builder" == assessment.missing_capability
             ):
-                state.final_answer = (
-                    "I understand the request: prepare a 300 K, 1 ps VASP AIMD setup "
-                    "from POSCAR.\n\n"
-                    "Safe baseline assumptions (not yet written): IBRION=0, NSW=1000, "
-                    "POTIM=1.0 fs, TEBEG=TEEND=300 K, fixed cell (ISIF=2), and a Γ-point "
-                    "mesh.\n\n"
-                    "Still required before generating inputs: a matching POTCAR, the "
-                    "exchange-correlation functional and ENCUT, spin/electronic-smearing "
-                    "choices, ensemble/thermostat, and confirmation that VASP is available. "
-                    "POSCAR alone cannot determine these. No files were written."
-                )
-                state.warnings.append(assessment.reason or "Scientific input is incomplete")
+                # The protocol-level files are safely determinable, so write them with
+                # explicit review comments. POTCAR/electronic choices remain untouched.
+                call = ToolCall("vasp-preflight", "prepare_vasp_aimd_inputs", {"source": "POSCAR"})
+                self._emit("tool_call", {"name": call.name, "arguments": call.arguments})
+                try:
+                    result = self.registry.execute(call.name, call.arguments)
+                    observation = {"ok": True, "result": result}
+                    state.created_files.extend(result.get("created_files", []))
+                    state.warnings.extend(result.get("warnings", []))
+                    state.phase = "inputs_prepared"
+                    state.tool_executions.append(ToolExecution(call=call, result=observation))
+                    self._emit("tool_result", {"name": call.name, "observation": observation})
+                    state.final_answer = (
+                        "Prepared VASP AIMD defaults for 300 K and 1 ps:\n"
+                        f"- created: {', '.join(result['created_files'])}\n"
+                        "- defaults: IBRION=0, NSW=1000, POTIM=1 fs, fixed cell (ISIF=2), "
+                        "Gamma-point KPOINTS\n"
+                        "- review required: POTCAR, functional, ENCUT, spin, smearing, "
+                        "thermostat/ensemble, and VASP availability\n"
+                        "These files are a starting template, not a validated production setup."
+                    )
+                except Exception as exc:
+                    observation = {"ok": False, "error": type(exc).__name__, "message": str(exc)}
+                    state.tool_executions.append(ToolExecution(call=call, result=observation))
+                    state.final_answer = (
+                        "I could not prepare the VASP defaults safely: " + str(exc)
+                    )
                 self._emit("capability_blocked", assessment.to_dict())
                 return state
         if self.intent_mode == "deterministic":
