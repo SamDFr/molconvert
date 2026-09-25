@@ -19,6 +19,8 @@ def detect_format(path: Path) -> tuple[str | None, list[str]]:
         return "traj", []
     if suffix == ".cif":
         return "cif", []
+    if suffix == ".extxyz":
+        return "extxyz", []
     if suffix in {".data", ".lammps", ".lmp"} or "lammps" in name:
         return "lammps-data", []
     if suffix == ".xyz":

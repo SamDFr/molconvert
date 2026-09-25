@@ -34,6 +34,13 @@ def test_poscar_to_extended_xyz_preserves_required_structure(workspace: Workspac
     assert report["information_lost_or_changed"] == []
 
 
+def test_extxyz_suffix_is_detected_and_validated(workspace: Workspace) -> None:
+    convert_structure(workspace, "POSCAR", "structure.extxyz", "extxyz")
+    report = validate_conversion(workspace, "POSCAR", "structure.extxyz")
+    assert report["destination_format"] == "extxyz"
+    assert report["classification"] == "exact"
+
+
 def test_poscar_to_lammps_data_preserves_basic_structure(workspace: Workspace) -> None:
     convert_structure(workspace, "POSCAR", "structure.data", "lammps-data")
     report = validate_conversion(workspace, "POSCAR", "structure.data")
