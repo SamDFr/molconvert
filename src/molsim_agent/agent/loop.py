@@ -150,7 +150,8 @@ class Agent(AgentRuntime):
         # Conversion behavior remains unchanged; scientific requests get a conservative
         # preflight that can explain missing implementation/dependencies to the model.
         if self.workflow.name != "conversion" and re.search(
-            r"\b(?:trajectory|autocorrelation|vacf|rdf|msd|molecular dynamics|md|simulation|observable)\b",
+            r"\b(?:trajectory|autocorrelation|vacf|rdf|msd|molecular dynamics|md|simulation|"
+            r"observable|aimd|vasp|incar|potcar|kpoints|k-points)\b",
             objective,
             re.IGNORECASE,
         ):
@@ -160,6 +161,24 @@ class Agent(AgentRuntime):
             )
             state.capability_assessments.append(assessment.to_dict())
             self._emit("capability_assessment", assessment.to_dict())
+            if (
+                assessment.status == "needs_user_input"
+                and "validated_vasp_workflow_builder" == assessment.missing_capability
+            ):
+                state.final_answer = (
+                    "I understand the request: prepare a 300 K, 1 ps VASP AIMD setup "
+                    "from POSCAR.\n\n"
+                    "Safe baseline assumptions (not yet written): IBRION=0, NSW=1000, "
+                    "POTIM=1.0 fs, TEBEG=TEEND=300 K, fixed cell (ISIF=2), and a Γ-point "
+                    "mesh.\n\n"
+                    "Still required before generating inputs: a matching POTCAR, the "
+                    "exchange-correlation functional and ENCUT, spin/electronic-smearing "
+                    "choices, ensemble/thermostat, and confirmation that VASP is available. "
+                    "POSCAR alone cannot determine these. No files were written."
+                )
+                state.warnings.append(assessment.reason or "Scientific input is incomplete")
+                self._emit("capability_blocked", assessment.to_dict())
+                return state
         if self.intent_mode == "deterministic":
             intent = (
                 self._compact_expected_arguments(state, "convert_structure")

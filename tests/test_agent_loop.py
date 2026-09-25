@@ -116,6 +116,17 @@ def test_greeting_does_not_send_tool_schemas(tmp_path) -> None:
     assert "Answer the user's message naturally" in agent._messages_for_model(state)[0].content
 
 
+def test_vasp_aimd_request_is_gated_without_inventing_inputs(tmp_path) -> None:
+    backend = MockBackend([])
+    state = Agent(backend=backend, workspace=tmp_path).run(
+        "Prepare VASP inputs for AIMD at 300K for 1ps from the POSCAR file"
+    )
+    assert state.final_answer is not None
+    assert "IBRION=0" in state.final_answer
+    assert "POTCAR" in state.final_answer
+    assert state.capability_assessments[0]["status"] == "needs_user_input"
+
+
 def test_compact_tool_schemas_use_portable_json_schema(tmp_path) -> None:
     (tmp_path / "POSCAR").write_text("fixture", encoding="utf-8")
     agent = Agent(backend=MockBackend([]), workspace=tmp_path, profile="compact")

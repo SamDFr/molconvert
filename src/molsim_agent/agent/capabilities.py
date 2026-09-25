@@ -15,6 +15,23 @@ def assess_capability(task: str, tool_names: set[str]) -> CapabilityAssessment:
     reports unknown analyses as implementable gaps instead of pretending they exist.
     """
     lowered = task.lower()
+    if "vasp" in lowered and any(
+        term in lowered for term in ("aimd", "incar", "potcar", "kpoints", "k-points", "input")
+    ):
+        return CapabilityAssessment(
+            CapabilityStatus.NEEDS_USER_INPUT,
+            task,
+            reason=(
+                "Reliable VASP/AIMD inputs depend on the pseudopotential set, electronic "
+                "structure, spin state, k-point convergence, timestep, ensemble, and "
+                "available VASP executable. These cannot be inferred safely from POSCAR alone."
+            ),
+            missing_capability="validated_vasp_workflow_builder",
+            proposed_solution=(
+                "Collect the missing scientific choices and pseudopotential metadata, then "
+                "generate INCAR/KPOINTS/POTCAR with explicit user approval."
+            ),
+        )
     aliases = {
         "single_point": ("single point", "energy and forces"),
         "geometry_optimization": ("geometry optimization", "optimize", "optimise"),
