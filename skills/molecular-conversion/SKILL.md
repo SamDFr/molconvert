@@ -13,6 +13,8 @@ every scientific request.
 - Validate a converted structure against its source using `validate_conversion`.
 - Prepare conservative VASP AIMD and LAMMPS MD templates with explicit defaults and
   missing-input reports.
+- Prepare GROMACS geometry and generic MD/topology templates, while refusing to invent
+  force fields, atom types, charges, or bonded parameters.
 - Run validated single-point, optimization, bounded MD, and baseline analysis tools when
   the required dependencies and calculators are available.
 - Assess capabilities before claiming that an observable or workflow was executed.

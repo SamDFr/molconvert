@@ -22,3 +22,6 @@ which values are defaults or derived and which required scientific inputs remain
 Never choose a force field, ML potential, POTCAR, ENCUT, functional, spin state, or
 electronic smearing setting without evidence. If no registered tool can prepare the
 requested workflow, return a capability assessment instead of inventing a script.
+For GROMACS MD requests, the registered tool may create a deterministic `.gro`, generic
+`.mdp`, and explicitly incomplete topology template. It must report that force-field
+parameters, atom types, charges, and topology still require user input.

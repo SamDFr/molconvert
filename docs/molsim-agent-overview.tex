@@ -46,13 +46,28 @@
 
 \begin{frame}{The explicit loop}
 \begin{center}
-\Large User objective $\rightarrow$ LLM $\rightarrow$ tool call $\rightarrow$ Python tool\\[0.4em]
+\Large User objective $\rightarrow$ LLM planner $\rightarrow$ validated plan\\[0.4em]
+Tool call $\rightarrow$ Python tool $\rightarrow$ observation\\[0.4em]
 Observation $\rightarrow$ state update $\rightarrow$ LLM\\[0.4em]
 \textbf{Final scientific report}
 \end{center}
 \vspace{0.5em}
 The runtime never treats plausible text as evidence. A successful tool observation is the
 boundary between a plan and an executed calculation.
+\end{frame}
+
+\begin{frame}{LLM planner for flexible requests}
+\begin{itemize}
+  \item Receives the complete objective, workspace files, and registered tool schemas.
+  \item Decomposes multi-task requests into ordered steps.
+  \item Produces structured arguments such as temperature, duration, ensemble, and source.
+  \item The runtime validates every step before execution.
+  \item If planning fails, the explicit tool-calling loop remains the safe fallback.
+\end{itemize}
+\begin{alertblock}{No prompt-specific branch}
+New user wording is handled by the planner rather than by adding a new hard-coded
+exception to the central runtime.
+\end{alertblock}
 \end{frame}
 
 \begin{frame}{Scientific orchestrator}
@@ -135,6 +150,19 @@ The POSCAR does not contain enough information to choose a classical potential.
   \item Validation compares atom count, symbols, positions, cell, PBC, and optional data.
   \item Experiment records store hashes, parameters, outputs, warnings, and versions.
 \end{itemize}
+\end{frame}
+
+\begin{frame}{Example: GROMACS MD}
+\begin{itemize}
+  \item Generated in the workspace output directory: ASE-based \texttt{.gro}, generic
+  \texttt{md.mdp}, and an explicitly incomplete topology template.
+  \item Defaults and derived values are reported before production use.
+  \item Missing: force field, atom types, charges, bonded parameters, topology, and
+  executable configuration.
+\end{itemize}
+\begin{alertblock}{Scientific boundary}
+The agent never invents a chemically valid GROMACS topology from a POSCAR alone.
+\end{alertblock}
 \end{frame}
 
 \begin{frame}{Safety boundaries}

@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 from molsim_agent.agent.messages import Message, ToolCall
-from molsim_agent.agent.intent import rewrite_objective
 from molsim_agent.agent.planner import build_system_prompt
 from molsim_agent.agent.state import AgentState, ToolExecution
 from molsim_agent.llm.base import LLMBackend
@@ -24,9 +23,11 @@ from molsim_agent.tools.validate import validation_tool_specs
 from molsim_agent.tools.analysis import analysis_tool_specs
 from molsim_agent.tools.vasp import vasp_tool_specs, prepare_vasp_aimd_inputs
 from molsim_agent.tools.lammps import lammps_tool_specs
+from molsim_agent.tools.gromacs import gromacs_tool_specs
 from molsim_agent.tools.templates import DEFAULT_TEMPLATE_WORKFLOWS, TemplateWorkflow
 from molsim_agent.agent.capabilities import assess_capability
 from molsim_agent.agent.runtime import AgentRuntime
+from molsim_agent.agent.scientific_planner import ScientificTaskPlan, plan_task
 from molsim_agent.agent.workflows import ConversionWorkflow, Workflow
 
 
@@ -116,6 +117,7 @@ class Agent(AgentRuntime):
                 validation_tool_specs(self.workspace),
                 vasp_tool_specs(self.workspace),
                 lammps_tool_specs(self.workspace),
+                gromacs_tool_specs(self.workspace),
             )
         else:
             tool_groups = (
@@ -127,6 +129,7 @@ class Agent(AgentRuntime):
                 simulation_tool_specs(self.workspace),
                 vasp_tool_specs(self.workspace),
                 lammps_tool_specs(self.workspace),
+                gromacs_tool_specs(self.workspace),
             )
         for group in tool_groups:
             for tool in group:
@@ -134,26 +137,20 @@ class Agent(AgentRuntime):
         return registry
 
     def run(self, objective: str) -> AgentState:
+        # LLM mode uses the general scientific planner below. The older
+        # conversion-only normalizer is kept as a public utility/fallback, but must
+        # not consume a model turn before the planner sees a multi-task objective.
         effective_objective = objective
-        if self.intent_mode == "llm":
-            try:
-                rewritten = rewrite_objective(self.backend, objective)
-            except Exception:
-                rewritten = None
-            if rewritten:
-                effective_objective = rewritten
-                self._emit(
-                    "intent_rewrite",
-                    {"status": "rewritten", "original": objective, "rewritten": rewritten},
-                )
-            elif not rewritten:
-                self._emit("intent_rewrite", {"status": "fallback"})
         state = AgentState(
             objective=effective_objective,
             original_objective=objective,
             dry_run=self.dry_run,
         )
         self.workflow = self.workflow_for(effective_objective)
+        if self.intent_mode == "llm":
+            plan = self._create_scientific_plan(objective)
+            if plan is not None and self._execute_scientific_plan(state, plan):
+                return state
         # Scientific template workflows are selected through a registry. The runtime
         # does not contain one branch per code; each registered handler owns its defaults.
         template = self.template_workflows.match(objective)
@@ -164,17 +161,37 @@ class Agent(AgentRuntime):
             )
             state.capability_assessments.append(assessment.to_dict())
             self._emit("capability_assessment", assessment.to_dict())
-            call = ToolCall(f"template-{template.name}", template.tool_name, {"source": "POSCAR"})
-            self._emit("tool_call", {"name": call.name, "arguments": call.arguments})
+            from molsim_agent.tools.templates import template_arguments
+            template_args = template_arguments(objective)
+            call = ToolCall(f"template-{template.name}", template.tool_name, template_args)
+            analysis_call = ToolCall("inspect_structure", "inspect_structure", {"path": "POSCAR"})
+            self._emit("progress_message", {"message": "Analyzing POSCAR before preparing the simulation setup…"})
+            self._emit("tool_call", {"name": analysis_call.name, "arguments": analysis_call.arguments})
             try:
-                result = self.template_workflows.execute(template, self.registry, "POSCAR")
+                analysis = self.registry.execute("inspect_structure", {"path": "POSCAR"})
+                analysis_observation = {"ok": True, "result": analysis}
+                state.tool_executions.append(ToolExecution(call=analysis_call, result=analysis_observation))
+                self._emit("tool_result", {"name": analysis_call.name, "observation": analysis_observation})
+                self._emit("progress_message", {"message": self._structure_analysis_message(analysis)})
+                self._emit("progress_message", {"message": f"Preparing {template.description} with the requested parameters…"})
+                self._emit("tool_call", {"name": call.name, "arguments": call.arguments})
+                if self.dry_run:
+                    result = {
+                        "ok": True,
+                        "dry_run": True,
+                        "created_files": [],
+                        "warnings": ["Dry run: no template files were written."],
+                        "scientific_plan": {"parameters": [], "missing_inputs": ["execution skipped in dry run"]},
+                    }
+                else:
+                    result = self.template_workflows.execute(template, self.registry, objective)
                 observation = {"ok": True, "result": result}
                 state.created_files.extend(result.get("created_files", []))
                 state.warnings.extend(result.get("warnings", []))
                 state.phase = "inputs_prepared"
                 state.tool_executions.append(ToolExecution(call=call, result=observation))
                 self._emit("tool_result", {"name": call.name, "observation": observation})
-                state.final_answer = self._template_report(template, result)
+                state.final_answer = self._template_report(template, result, analysis)
             except Exception as exc:
                 observation = {"ok": False, "error": type(exc).__name__, "message": str(exc)}
                 state.tool_executions.append(ToolExecution(call=call, result=observation))
@@ -391,8 +408,82 @@ class Agent(AgentRuntime):
         if self.event_handler is not None:
             self.event_handler(event, payload)
 
+    def _create_scientific_plan(self, objective: str) -> ScientificTaskPlan | None:
+        try:
+            files = sorted(
+                str(path.relative_to(self.workspace.root))
+                for path in self.workspace.root.rglob("*")
+                if path.is_file() and ".git" not in path.parts
+            )[:200]
+            plan = plan_task(self.backend, objective, self.registry.schemas(), files)
+            if plan is not None:
+                self._emit("plan_created", {"objective": plan.objective, "steps": [
+                    {"tool": step.tool, "arguments": step.arguments, "purpose": step.purpose}
+                    for step in plan.steps
+                ], "missing_inputs": list(plan.missing_inputs), "assumptions": list(plan.assumptions)})
+            return plan
+        except Exception as exc:
+            self._emit("plan_failed", {"message": str(exc)})
+            return None
+
+    def _execute_scientific_plan(self, state: AgentState, plan: ScientificTaskPlan) -> bool:
+        """Validate and execute an LLM plan; return False so the normal loop can fall back."""
+        try:
+            for step in plan.steps:
+                self.registry.validate(step.tool, step.arguments)
+        except (KeyError, TypeError, ValueError):
+            return False
+        state.plan = {
+            "objective": plan.objective,
+            "steps": [{"tool": step.tool, "arguments": step.arguments, "purpose": step.purpose} for step in plan.steps],
+            "missing_inputs": list(plan.missing_inputs),
+            "assumptions": list(plan.assumptions),
+        }
+        observations: list[dict[str, Any]] = []
+        for index, step in enumerate(plan.steps, start=1):
+            call = ToolCall(f"plan-{index}", step.tool, step.arguments)
+            purpose = step.purpose or f"Executing {step.tool}"
+            self._emit("progress_message", {"message": purpose})
+            self._emit("tool_call", {"name": step.tool, "arguments": step.arguments})
+            try:
+                spec = self.registry.get(step.tool)
+                if self.dry_run and spec.risk == "write":
+                    result = {"ok": True, "dry_run": True, "planned_tool": step.tool,
+                              "planned_arguments": step.arguments,
+                              "warnings": ["Dry run: no files were written."]}
+                else:
+                    result = self.registry.execute(step.tool, step.arguments)
+                observation = {"ok": True, "result": result}
+                state.created_files.extend(result.get("created_files", []))
+                state.modified_files.extend(result.get("modified_files", []))
+                state.warnings.extend(result.get("warnings", []))
+            except Exception as exc:
+                observation = {"ok": False, "error": type(exc).__name__, "message": str(exc)}
+            state.tool_executions.append(ToolExecution(call=call, result=observation))
+            observations.append({"tool": step.tool, "observation": observation})
+            self._emit("tool_result", {"name": step.tool, "observation": observation})
+            if not observation["ok"]:
+                state.final_answer = f"The planned tool {step.tool} failed: {observation.get('message')}"
+                return True
+        state.phase = "completed"
+        state.iteration_count = len(plan.steps)
+        report_messages = [
+            Message(role="system", content=(
+                "Write a concise scientific report from the executed plan and observations. "
+                "Separate actions performed, evidence, created files, defaults, missing "
+                "inputs, limitations, and next steps. Never claim an unexecuted calculation."
+            )),
+            Message(role="user", content=json.dumps({"objective": plan.objective, "observations": observations, "missing_inputs": plan.missing_inputs, "assumptions": plan.assumptions}, ensure_ascii=False)),
+        ]
+        try:
+            response = self.backend.chat(report_messages, [])
+            state.final_answer = response.content.strip() or "The requested plan completed; see the tool observations."
+        except Exception:
+            state.final_answer = "The requested plan completed; see the tool observations."
+        return True
+
     @staticmethod
-    def _template_report(template: TemplateWorkflow, result: dict[str, Any]) -> str:
+    def _template_report(template: TemplateWorkflow, result: dict[str, Any], analysis: dict[str, Any] | None = None) -> str:
         plan = result.get("scientific_plan", {})
         created = ", ".join(result.get("created_files", [])) or "no files"
         defaults = [
@@ -401,12 +492,32 @@ class Agent(AgentRuntime):
             if item.get("source") in {"default", "derived"}
         ]
         missing = ", ".join(plan.get("missing_inputs", [])) or "none reported"
+        structure_line = ""
+        if analysis:
+            structure = analysis.get("structure", {})
+            structure_line = (
+                f"- analyzed structure: {structure.get('atom_count', '?')} atoms, "
+                f"species={structure.get('species_counts', {})}, pbc={structure.get('pbc', '?')}\n"
+            )
         return (
             f"Prepared {template.description}.\n"
-            f"- created: {created}\n"
-            f"- defaults/derived: {', '.join(defaults) or 'none'}\n"
-            f"- review required: {missing}\n"
-            "The generated files are templates and must be reviewed before production use."
+            + structure_line
+            + f"- created: {created}\n"
+            + f"- defaults/derived: {', '.join(defaults) or 'none'}\n"
+            + f"- review required: {missing}\n"
+            + "The generated files are templates and must be reviewed before production use."
+        )
+
+    @staticmethod
+    def _structure_analysis_message(result: dict[str, Any]) -> str:
+        structure = result.get("structure", {})
+        if not structure:
+            return "Structure inspection completed, but no structural summary was returned."
+        return (
+            "POSCAR analysis complete: "
+            f"{structure.get('atom_count', '?')} atoms; "
+            f"species {structure.get('species_counts', {})}; "
+            f"PBC {structure.get('pbc', '?')}; cell and optional properties inspected."
         )
 
     @staticmethod

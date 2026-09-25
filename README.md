@@ -192,6 +192,11 @@ LAMMPS data file and an `in.molsim` template with standard protocol defaults. It
 explicit `__REQUIRED__` placeholders for `pair_style` and `pair_coeff` rather than
 inventing a force field or ML potential. The template must be reviewed before execution.
 
+For GROMACS MD preparation, the agent can write an ASE-generated `.gro` geometry, a
+generic `md.mdp`, and an explicitly incomplete `topol.top.template`. A POSCAR does not
+contain force-field parameters, atom types, or charges, so these are reported as missing
+and are never fabricated. Review the files before running `gmx grompp`.
+
 Examples:
 
 ```text
@@ -200,9 +205,33 @@ Run 100 steps of NVE MD on h2.xyz at 0.5 fs and save the trajectory.
 Summarize the trajectory in runs/md-*/trajectory.traj.
 ```
 
+For a complete orchestrator exercise, see
+[`examples/scientific_orchestrator_prompt.txt`](examples/scientific_orchestrator_prompt.txt).
+It asks the agent to understand a scientific objective, assess capabilities, choose a
+safe workflow, generate only justified files, validate them, and report missing inputs.
+
+Long prompts can be entered without terminal copy/paste using the optional desktop chat:
+
+```bash
+molsim-agent --dialog --provider groq --model openai/gpt-oss-20b --profile full
+```
+
+The chat keeps a conversation history, displays tool calls and observations, and lets you
+send several requests in one session. It uses Tkinter from the standard Python
+distribution. On a headless machine it falls back to the terminal prompt. You can also
+run a saved prompt directly with `--prompt-file examples/scientific_orchestrator_prompt.txt`.
+
 The compact profile intentionally remains conversion-focused for small local models.
 Use `--profile full` for scientific simulation and analysis requests so the orchestrator
 can see the broader tool registry.
+
+In `--intent-mode llm`, the scientific planner first receives the complete user request,
+the files visible in the workspace, and the registered tool schemas. It returns an
+ordered structured plan, which the runtime validates before executing. This allows a
+single request to combine inspection, preparation, conversion, validation, and reporting
+without adding a new hard-coded branch for every wording or user workflow. If the planner
+cannot return a valid plan, the explicit tool-calling loop remains available as a safe
+fallback.
 
 ### Execution profiles
 

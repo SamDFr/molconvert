@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from molsim_agent import Agent
@@ -105,8 +106,9 @@ def test_auto_profile_uses_compact_context_for_ollama(tmp_path) -> None:
         "convert_structure",
         "validate_conversion",
         "prepare_vasp_aimd_inputs",
-        "prepare_lammps_md_inputs",
-    }
+            "prepare_lammps_md_inputs",
+            "prepare_gromacs_md_inputs",
+        }
     assert "Compact Molecular Conversion" in agent.system_prompt
 
 
@@ -129,8 +131,8 @@ def test_vasp_aimd_request_is_gated_without_inventing_inputs(tmp_path) -> None:
     assert "IBRION=0" in state.final_answer
     assert "POTCAR" in state.final_answer
     assert state.capability_assessments[0]["status"] == "needs_user_input"
-    assert (tmp_path / "INCAR").exists()
-    assert (tmp_path / "KPOINTS").exists()
+    assert (tmp_path / "outputs" / "INCAR").exists()
+    assert (tmp_path / "outputs" / "KPOINTS").exists()
 
 
 def test_compact_tool_schemas_use_portable_json_schema(tmp_path) -> None:
@@ -175,6 +177,41 @@ def test_llm_intent_mode_rewrites_before_agent_loop(tmp_path) -> None:
     assert rewrite_objective(backend, "make the POSCAR into a LAMMPS input geometry file") == (
         "Convert POSCAR to POSCAR.data, then validate the conversion"
     )
+
+
+def test_llm_planner_executes_multitask_plan_without_template_shortcut(tmp_path) -> None:
+    from shutil import copyfile
+    copyfile(Path(__file__).parent / "fixtures" / "POSCAR", tmp_path / "POSCAR")
+    plan = {
+        "objective": "analyze and prepare LAMMPS MD",
+        "steps": [
+            {"tool": "inspect_structure", "arguments": {"path": "POSCAR"}, "purpose": "Analyze POSCAR"},
+            {"tool": "prepare_lammps_md_inputs", "arguments": {
+                "source": "POSCAR", "temperature_K": 10, "duration_ps": 1,
+                "timestep_fs": 1, "ensemble": "nvt",
+            }, "purpose": "Prepare the requested setup"},
+        ],
+        "missing_inputs": ["force field"],
+        "assumptions": [],
+    }
+    backend = MockBackend([LLMResponse(content=json.dumps(plan)), LLMResponse(content="Plan completed.")])
+    state = Agent(backend=backend, workspace=tmp_path, profile="full", intent_mode="llm").run(
+        "Analyze POSCAR and prepare LAMMPS NVT MD at 10 K"
+    )
+    assert state.final_answer == "Plan completed."
+    assert state.plan is not None
+    assert "outputs/in.molsim" in state.created_files
+
+
+def test_template_workflow_dry_run_does_not_write_outputs(tmp_path) -> None:
+    from shutil import copyfile
+    copyfile(Path(__file__).parent / "fixtures" / "POSCAR", tmp_path / "POSCAR")
+    state = Agent(backend=MockBackend([]), workspace=tmp_path, dry_run=True).run(
+        "Prepare LAMMPS NVT MD at 10 K from POSCAR"
+    )
+    assert state.created_files == []
+    assert not (tmp_path / "outputs").exists()
+    assert "dry run" in (state.final_answer or "").lower()
 
 
 def test_progress_mode_requests_brief_model_status(tmp_path) -> None:

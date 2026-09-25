@@ -40,6 +40,14 @@ def assess_capability(task: str, tool_names: set[str]) -> CapabilityAssessment:
             missing_capability="validated_lammps_workflow_builder",
             proposed_solution="Prepare a data file and input template with explicit pair_style/pair_coeff placeholders.",
         )
+    if "gromacs" in lowered and any(term in lowered for term in ("md", "molecular dynamics", "input", "run")):
+        return CapabilityAssessment(
+            CapabilityStatus.NEEDS_USER_INPUT,
+            task,
+            reason="A POSCAR provides geometry, but GROMACS also requires a force field, atom types, charges, and topology.",
+            missing_capability="validated_gromacs_workflow_builder",
+            proposed_solution="Prepare deterministic .gro and generic .mdp templates, then require an explicit force field and topology before running.",
+        )
     aliases = {
         "single_point": ("single point", "energy and forces"),
         "geometry_optimization": ("geometry optimization", "optimize", "optimise"),

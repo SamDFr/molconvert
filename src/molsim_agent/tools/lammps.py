@@ -24,11 +24,13 @@ def prepare_lammps_md_inputs(
     if ensemble.lower() not in {"nvt", "nve"}:
         raise ValueError("ensemble must be nvt or nve")
     steps = round(duration_ps * 1000.0 / timestep_fs)
-    data_name = f"{source.rsplit('/', 1)[-1]}.data"
+    output_dir = workspace.root / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_name = f"outputs/{source.rsplit('/', 1)[-1]}.data"
     data = convert_structure(workspace, source, data_name, "lammps-data", overwrite=overwrite)
-    script_path = workspace.resolve("in.molsim", must_exist=False)
+    script_path = workspace.resolve("outputs/in.molsim", must_exist=False)
     if script_path.exists() and not overwrite:
-        raise FileExistsError("Refusing to overwrite existing in.molsim; authorize overwrite explicitly")
+        script_path = _next_available_script(script_path)
     fix_line = (
         f"fix                  integrator all nvt temp {temperature_K:g} {temperature_K:g} 100.0"
         if ensemble.lower() == "nvt"
@@ -39,7 +41,7 @@ clear
 units                metal
 atom_style           atomic
 boundary             p p p
-read_data            {data['destination']}
+read_data            {data['destination'].split('/', 1)[-1]}
 
 # REQUIRED USER REVIEW: pair_style, pair_coeff, masses, and any long-range settings.
 # No force field or ML potential can be inferred from POSCAR.
@@ -63,16 +65,25 @@ run                  {steps}
             ParameterValue("steps", steps, "derived", True),
         ],
         missing_inputs=["pair_style", "pair_coeff", "force-field or ML potential", "validated masses", "LAMMPS executable"],
-        artifacts=[str(data["destination"]), "in.molsim"],
+        artifacts=[str(data["destination"]), workspace.relative(script_path)],
     )
     return {
-        "ok": True, "created_files": list(data.get("created_files", [])) + ["in.molsim"],
+        "ok": True, "created_files": list(data.get("created_files", [])) + [workspace.relative(script_path)],
         "destination": data["destination"], "scientific_plan": plan.to_dict(),
         "warnings": list(data.get("warnings", [])) + [
             "LAMMPS input contains explicit __REQUIRED__ force-field placeholders.",
             "Do not run until pair_style/pair_coeff and masses are supplied and reviewed.",
         ],
     }
+
+
+def _next_available_script(path):
+    index = 1
+    while True:
+        candidate = path.with_name(f"{path.stem}_{index}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+        index += 1
 
 
 def lammps_tool_specs(workspace: Workspace) -> list[ToolSpec]:

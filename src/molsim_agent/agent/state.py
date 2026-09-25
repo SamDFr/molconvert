@@ -33,3 +33,4 @@ class AgentState:
     generated_tools: list[dict[str, Any]] = field(default_factory=list)
     capability_assessments: list[dict[str, Any]] = field(default_factory=list)
     provenance: dict[str, Any] = field(default_factory=dict)
+    plan: dict[str, Any] | None = None

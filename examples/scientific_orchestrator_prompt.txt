@@ -1,0 +1,45 @@
+Act as a scientific molecular-simulation orchestrator.
+
+Starting from the structure available in the workspace, determine the safest and most
+useful workflow for preparing a short molecular-dynamics simulation.
+
+The user goal is:
+Prepare a reproducible 300 K, 1 ps molecular-dynamics setup from the available
+structure, preferably for GROMACS, but do not assume that all required scientific
+information is present.
+
+Before executing anything:
+
+1. Inspect the workspace and identify the available structure files.
+2. Determine the input format and summarize the structure scientifically: atom count,
+   species, cell, periodicity, velocities, forces, energies, and constraints.
+3. Assess which parts of the requested workflow are currently executable with
+   registered tools.
+4. Identify missing scientific capabilities or inputs: force field, atom types,
+   charges, topology, executable, or other data.
+5. Decide which files can be generated deterministically without inventing scientific
+   information.
+6. Choose standard generic defaults only where scientifically reasonable, and label
+   every default as default or derived.
+7. Do not invent force-field parameters, charges, bonded parameters, pseudopotentials,
+   or model-specific settings.
+8. Preserve the original input files and never overwrite existing files.
+9. Generate the safe GROMACS preparation files that can be produced: geometry file,
+   generic MD parameter file, and an explicitly incomplete topology template if
+   appropriate.
+10. Validate every generated structure file against the original structure.
+11. Do not run a production simulation unless the required topology and force field
+    are available.
+12. Finish with a structured report containing:
+    - scientific objective understood;
+    - workflow selected;
+    - actions actually executed;
+    - files created;
+    - defaults used;
+    - information preserved;
+    - information missing;
+    - limitations;
+    - recommended next steps.
+
+Do not merely describe a hypothetical workflow. Use the available tools when execution
+is safe, and clearly distinguish planning, execution, validation, and interpretation.

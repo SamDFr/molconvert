@@ -30,8 +30,10 @@ def prepare_vasp_aimd_inputs(
     steps = round(duration_ps * 1000.0 / timestep_fs)
     if steps < 1:
         raise ValueError("duration and timestep produce no MD steps")
-    incar = workspace.root / "INCAR"
-    kpoints = workspace.root / "KPOINTS"
+    output_dir = workspace.root / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    incar = output_dir / "INCAR"
+    kpoints = output_dir / "KPOINTS"
     targets = [incar, kpoints]
     existing = [workspace.relative(path) for path in targets if path.exists()]
     if existing and not overwrite:
