@@ -23,6 +23,7 @@ from molsim_agent.tools.registry import ToolRegistry
 from molsim_agent.tools.validate import validation_tool_specs
 from molsim_agent.tools.analysis import analysis_tool_specs
 from molsim_agent.tools.vasp import vasp_tool_specs, prepare_vasp_aimd_inputs
+from molsim_agent.tools.lammps import lammps_tool_specs
 from molsim_agent.agent.capabilities import assess_capability
 from molsim_agent.agent.runtime import AgentRuntime
 from molsim_agent.agent.workflows import ConversionWorkflow, Workflow
@@ -112,6 +113,7 @@ class Agent(AgentRuntime):
                 conversion_tool_specs(self.workspace),
                 validation_tool_specs(self.workspace),
                 vasp_tool_specs(self.workspace),
+                lammps_tool_specs(self.workspace),
             )
         else:
             tool_groups = (
@@ -122,6 +124,7 @@ class Agent(AgentRuntime):
                 analysis_tool_specs(self.workspace),
                 simulation_tool_specs(self.workspace),
                 vasp_tool_specs(self.workspace),
+                lammps_tool_specs(self.workspace),
             )
         for group in tool_groups:
             for tool in group:
@@ -195,6 +198,29 @@ class Agent(AgentRuntime):
                     state.final_answer = (
                         "I could not prepare the VASP defaults safely: " + str(exc)
                     )
+                self._emit("capability_blocked", assessment.to_dict())
+                return state
+            if assessment.missing_capability == "validated_lammps_workflow_builder":
+                call = ToolCall("lammps-preflight", "prepare_lammps_md_inputs", {"source": "POSCAR"})
+                self._emit("tool_call", {"name": call.name, "arguments": call.arguments})
+                try:
+                    result = self.registry.execute(call.name, call.arguments)
+                    observation = {"ok": True, "result": result}
+                    state.created_files.extend(result.get("created_files", []))
+                    state.warnings.extend(result.get("warnings", []))
+                    state.tool_executions.append(ToolExecution(call=call, result=observation))
+                    self._emit("tool_result", {"name": call.name, "observation": observation})
+                    state.final_answer = (
+                        "Prepared a LAMMPS MD template for 300 K and 1 ps:\n"
+                        f"- created: {', '.join(result.get('created_files', []))}\n"
+                        "- defaults: metal units, 1 fs timestep, 1000 steps, periodic boundaries, NVT\n"
+                        "- review required: pair_style, pair_coeff, force-field/ML potential, masses, and LAMMPS executable\n"
+                        "The input contains explicit __REQUIRED__ placeholders and must not be run before they are replaced."
+                    )
+                except Exception as exc:
+                    observation = {"ok": False, "error": type(exc).__name__, "message": str(exc)}
+                    state.tool_executions.append(ToolExecution(call=call, result=observation))
+                    state.final_answer = "I could not prepare the LAMMPS template safely: " + str(exc)
                 self._emit("capability_blocked", assessment.to_dict())
                 return state
         if self.intent_mode == "deterministic":

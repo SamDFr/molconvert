@@ -32,6 +32,14 @@ def assess_capability(task: str, tool_names: set[str]) -> CapabilityAssessment:
                 "generate INCAR/KPOINTS/POTCAR with explicit user approval."
             ),
         )
+    if "lammps" in lowered and any(term in lowered for term in ("md", "molecular dynamics", "input", "run")):
+        return CapabilityAssessment(
+            CapabilityStatus.NEEDS_USER_INPUT,
+            task,
+            reason="LAMMPS requires an explicit force field or ML potential; POSCAR does not contain one.",
+            missing_capability="validated_lammps_workflow_builder",
+            proposed_solution="Prepare a data file and input template with explicit pair_style/pair_coeff placeholders.",
+        )
     aliases = {
         "single_point": ("single point", "energy and forces"),
         "geometry_optimization": ("geometry optimization", "optimize", "optimise"),

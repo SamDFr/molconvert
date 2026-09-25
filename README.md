@@ -187,6 +187,11 @@ functional, spin settings, or electronic smearing. The final report lists every 
 that must be reviewed before production use, and existing inputs are protected unless
 overwrite is explicitly authorized.
 
+The same policy applies to LAMMPS MD preparation. The agent can create a deterministic
+LAMMPS data file and an `in.molsim` template with standard protocol defaults. It leaves
+explicit `__REQUIRED__` placeholders for `pair_style` and `pair_coeff` rather than
+inventing a force field or ML potential. The template must be reviewed before execution.
+
 Examples:
 
 ```text

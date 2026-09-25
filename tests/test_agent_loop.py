@@ -105,6 +105,7 @@ def test_auto_profile_uses_compact_context_for_ollama(tmp_path) -> None:
         "convert_structure",
         "validate_conversion",
         "prepare_vasp_aimd_inputs",
+        "prepare_lammps_md_inputs",
     }
     assert "Compact Molecular Conversion" in agent.system_prompt
 
