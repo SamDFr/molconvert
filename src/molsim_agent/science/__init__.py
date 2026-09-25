@@ -9,6 +9,10 @@ from molsim_agent.science.models import (
     CapabilityStatus,
     ExperimentRecord,
     MDSpec,
+    OptimizationSpec,
+    SinglePointSpec,
+    OptimizationSpec,
+    SinglePointSpec,
     ScientificSpecError,
 )
 
@@ -17,5 +21,9 @@ __all__ = [
     "CapabilityStatus",
     "ExperimentRecord",
     "MDSpec",
+    "OptimizationSpec",
+    "SinglePointSpec",
+    "OptimizationSpec",
+    "SinglePointSpec",
     "ScientificSpecError",
 ]
