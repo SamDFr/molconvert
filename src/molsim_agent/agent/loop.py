@@ -20,6 +20,7 @@ from molsim_agent.tools.convert import conversion_tool_specs
 from molsim_agent.tools.inspect import inspection_tool_specs
 from molsim_agent.tools.registry import ToolRegistry
 from molsim_agent.tools.validate import validation_tool_specs
+from molsim_agent.agent.capabilities import assess_capability
 
 
 DEFAULT_SYSTEM_PROMPT = """You are a molecular-simulation conversion agent.
@@ -133,6 +134,20 @@ class Agent:
             original_objective=objective,
             dry_run=self.dry_run,
         )
+        # Capability assessment is explicit state, not an assertion hidden in a prompt.
+        # Conversion behavior remains unchanged; scientific requests get a conservative
+        # preflight that can explain missing implementation/dependencies to the model.
+        if not self._is_conversion_objective(objective) and re.search(
+            r"\b(?:trajectory|autocorrelation|vacf|rdf|msd|molecular dynamics|md|simulation|observable)\b",
+            objective,
+            re.IGNORECASE,
+        ):
+            assessment = assess_capability(
+                objective,
+                {item["name"] for item in self.registry.available_capabilities()},
+            )
+            state.capability_assessments.append(assessment.to_dict())
+            self._emit("capability_assessment", assessment.to_dict())
         if self.intent_mode == "deterministic":
             intent = (
                 self._compact_expected_arguments(state, "convert_structure")

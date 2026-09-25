@@ -159,5 +159,6 @@ def validation_tool_specs(workspace: Workspace) -> list[ToolSpec]:
                 workspace, source, destination, tolerance
             ),
             safety={"filesystem": "read", "workspace_only": True},
+            category="analysis", risk="read", requirements=("ase",), compute_cost="cpu", deterministic=True,
         )
     ]

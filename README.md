@@ -121,6 +121,37 @@ moderation, identity/access management, a benchmark suite, or a human approval s
 Those controls become necessary when the agent is exposed to untrusted users, remote
 systems, or high-impact workflow changes.
 
+## Scientific-agent foundation (incremental)
+
+The repository now has explicit domain boundaries for the next research workflows:
+
+```text
+Scientific Orchestrator (Agent runtime)
+  | capability assessment
+  +--> trusted deterministic tools (ASE/analysis)
+  +--> ScientificCodeAgent boundary (temporary generated_tools/)
+  +--> SimulationAgent boundary (validated specifications)
+                         |
+                    ExperimentRecord
+```
+
+`CapabilityAssessment` distinguishes understanding a request from being able to execute
+it. A request can be `available`, `needs_implementation`, `needs_dependency`,
+`needs_external_data`, `needs_compute`, `needs_user_input`, or `unsupported`. Unknown
+observables are never silently replaced by a different calculation. `SubAgentResult` and
+`SubAgent` provide an isolated delegation contract; the current release keeps generated
+code opt-in and never edits trusted `src/` automatically.
+
+`ToolSpec` also exposes category, risk, requirements, compute cost, and determinism so a
+future orchestrator can preflight tools without inspecting Python callables. `MDSpec`,
+`SinglePointSpec`, `OptimizationSpec`, and `ExperimentRecord` are backend-neutral models
+for validated simulations and provenance. MACE and UMA are optional: no large model is
+downloaded by installation, and `PotentialRegistry` reports missing dependencies clearly.
+
+The initial analysis helpers (`trajectory_summary`, pair-distance statistics, and MSD)
+are deterministic functions. Full MD execution, dynamic code generation, and model
+comparison remain intentionally staged work; see the roadmap below.
+
 ### Execution profiles
 
 Profiles change the context and constraints presented to the model, not the ASE

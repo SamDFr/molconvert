@@ -20,6 +20,10 @@ Issues = "https://github.com/SamDFr/molconvert/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+analysis = ["MDAnalysis>=2.7", "scipy>=1.11", "pandas>=2"]
+mace = ["mace-torch>=0.3"]
+uma = ["fairchem-core>=1"]
+all = ["pytest>=8", "MDAnalysis>=2.7", "scipy>=1.11", "pandas>=2", "mace-torch>=0.3", "fairchem-core>=1"]
 
 [project.scripts]
 molsim-agent = "molsim_agent.cli:main"

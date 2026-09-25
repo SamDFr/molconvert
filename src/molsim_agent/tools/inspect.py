@@ -57,6 +57,7 @@ def inspection_tool_specs(
             path_parameter,
             lambda path: detect_file_format(workspace, path),
             {"filesystem": "read", "workspace_only": True},
+            category="structure", risk="read", requirements=("ase",), compute_cost="trivial", deterministic=True,
         ),
         ToolSpec(
             "inspect_structure",
@@ -66,5 +67,6 @@ def inspection_tool_specs(
                 workspace, path, include_coordinates=include_coordinates
             ),
             {"filesystem": "read", "workspace_only": True},
+            category="structure", risk="read", requirements=("ase",), compute_cost="cpu", deterministic=True,
         ),
     ]

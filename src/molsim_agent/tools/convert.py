@@ -140,5 +140,6 @@ def conversion_tool_specs(workspace: Workspace) -> list[ToolSpec]:
                 "workspace_only": True,
                 "overwrite_requires_explicit_argument": True,
             },
+            category="conversion", risk="write", requirements=("ase",), compute_cost="cpu", deterministic=True,
         )
     ]

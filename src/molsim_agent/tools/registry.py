@@ -16,6 +16,11 @@ class ToolSpec:
     parameters: dict[str, Any]
     function: ToolFunction = field(repr=False)
     safety: dict[str, Any] = field(default_factory=dict)
+    category: str = "general"
+    risk: str = "read"
+    requirements: tuple[str, ...] = ()
+    compute_cost: str = "trivial"
+    deterministic: bool = True
 
     def model_schema(self) -> dict[str, Any]:
         return {
@@ -40,11 +45,29 @@ class ToolRegistry:
     def schemas(self) -> list[dict[str, Any]]:
         return [tool.model_schema() for tool in self._tools.values()]
 
-    def execute(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    def get(self, name: str) -> ToolSpec:
         try:
-            tool = self._tools[name]
+            return self._tools[name]
         except KeyError as exc:
             raise ValueError(f"Unknown tool: {name}") from exc
+
+    def available_capabilities(self) -> list[dict[str, Any]]:
+        """Return metadata without exposing Python callables to a model."""
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "category": tool.category,
+                "risk": tool.risk,
+                "requirements": list(tool.requirements),
+                "compute_cost": tool.compute_cost,
+                "deterministic": tool.deterministic,
+            }
+            for tool in self._tools.values()
+        ]
+
+    def execute(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        tool = self.get(name)
         self._validate_arguments(tool, arguments)
         result = tool.function(**arguments)
         if not isinstance(result, dict):
@@ -53,10 +76,7 @@ class ToolRegistry:
 
     def validate(self, name: str, arguments: dict[str, Any]) -> None:
         """Validate a model call without executing its Python function."""
-        try:
-            tool = self._tools[name]
-        except KeyError as exc:
-            raise ValueError(f"Unknown tool: {name}") from exc
+        tool = self.get(name)
         self._validate_arguments(tool, arguments)
 
     @staticmethod

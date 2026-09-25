@@ -27,3 +27,9 @@ class AgentState:
     warnings: list[str] = field(default_factory=list)
     iteration_count: int = 0
     final_answer: str | None = None
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
+    experiments: list[dict[str, Any]] = field(default_factory=list)
+    subagent_runs: list[dict[str, Any]] = field(default_factory=list)
+    generated_tools: list[dict[str, Any]] = field(default_factory=list)
+    capability_assessments: list[dict[str, Any]] = field(default_factory=list)
+    provenance: dict[str, Any] = field(default_factory=dict)

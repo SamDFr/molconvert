@@ -1,7 +1,7 @@
-.venv/
+.DS_Store
 __pycache__/
 *.py[cod]
-.pytest_cache/
-dist/
-build/
-*.egg-info/
+*.xyz
+*.data
+generated_tools/*
+!generated_tools/.gitkeep
