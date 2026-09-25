@@ -1,13 +1,16 @@
 # molsim-agent
 
-`molsim-agent` is an educational, open-source agent for molecular-simulation file
-conversion. It lets a local LLM decide which safe, deterministic tools to use, observes
-their structured results, validates scientific preservation, and reports limitations.
+`molsim-agent` is an educational, open-source scientific agent for molecular simulation.
+It lets an LLM understand a research objective, assess the capabilities available in the
+current environment, select safe deterministic tools, validate calculations, and explain
+limitations. Structure-file conversion is one workflow among several, not the central
+purpose of the project.
 The orchestration loop is intentionally implemented here—there is no LangChain,
 LangGraph, CrewAI, AutoGen, or other agent framework hiding it.
 
-Version 0.1 focuses on structures in VASP POSCAR/CONTCAR, XYZ/extXYZ, CIF, ASE `.traj`,
-and LAMMPS data formats. It does not pretend that simulation input decks are interchangeable.
+The current release includes structure conversion plus the foundations for trajectory
+analysis, simulation specifications, calculator discovery, provenance, and temporary
+scientific-code delegation. It does not pretend that simulation input decks are interchangeable.
 ASE supports many additional readers and writers; they are intentionally not exposed until
 each one has a project-specific safety policy and validation coverage. A request for one of
 those formats is reported as “not implemented here”, rather than silently delegated to an
@@ -57,25 +60,19 @@ atomic coordinates itself.
 User
   |
   v
-Agent Runtime (loop.py + explicit AgentState)
+Scientific Orchestrator (explicit AgentState + bounded runtime)
+  |
+  +--> capability assessment
+  +--> LLM backend (Ollama/OpenAI-compatible/Anthropic)
+  +--> trusted tool registry
+          +--> simulation (ASE + optional calculators)
+          +--> trajectory analysis
+          +--> structure conversion (sub-workflow)
+          +--> validation and provenance
+  +--> ScientificCodeAgent (temporary generated tools)
   |
   v
-LLMBackend ----------------------------------+
-  |                                          |
-  +--> OllamaBackend                         |
-  +--> test MockBackend                      |
-  |                                          |
-  | tool call                                | final answer
-  v                                          |
-Tool Registry                                |
-  |                                          |
-  +--> constrained filesystem                |
-  +--> format detection / inspection         |
-  +--> deterministic ASE conversion          |
-  +--> independent validation                |
-  |                                          |
-  v                                          |
-structured Observation ----------------> next LLM call
+structured observations -> next LLM call -> scientific report
 ```
 
 The important modules are:
@@ -151,6 +148,27 @@ downloaded by installation, and `PotentialRegistry` reports missing dependencies
 The initial analysis helpers (`trajectory_summary`, pair-distance statistics, and MSD)
 are deterministic functions. Full MD execution, dynamic code generation, and model
 comparison remain intentionally staged work; see the roadmap below.
+
+### Scientific workflows available in this milestone
+
+The full profile exposes trusted ASE tools for `single_point`,
+`geometry_optimization`, and bounded `run_md` (NVE or Langevin NVT). Each run writes a
+run-specific directory under `runs/`, including results, trajectories where relevant,
+logs, and an `experiment.json` provenance record. The built-in EMT calculator is useful
+for tests and demonstrations; MACE and UMA are discovered only when their optional
+dependencies are installed.
+
+Examples:
+
+```text
+Run a single-point EMT calculation on h2.xyz.
+Run 100 steps of NVE MD on h2.xyz at 0.5 fs and save the trajectory.
+Summarize the trajectory in runs/md-*/trajectory.traj.
+```
+
+The compact profile intentionally remains conversion-focused for small local models.
+Use `--profile full` for scientific simulation and analysis requests so the orchestrator
+can see the broader tool registry.
 
 ### Execution profiles
 

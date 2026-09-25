@@ -17,16 +17,23 @@ from molsim_agent.llm.base import LLMBackend
 from molsim_agent.safety.policies import Workspace
 from molsim_agent.tools.filesystem import filesystem_tool_specs
 from molsim_agent.tools.convert import conversion_tool_specs
+from molsim_agent.tools.simulation import simulation_tool_specs
 from molsim_agent.tools.inspect import inspection_tool_specs
 from molsim_agent.tools.registry import ToolRegistry
 from molsim_agent.tools.validate import validation_tool_specs
+from molsim_agent.tools.analysis import analysis_tool_specs
 from molsim_agent.agent.capabilities import assess_capability
+from molsim_agent.agent.runtime import AgentRuntime
+from molsim_agent.agent.workflows import ConversionWorkflow, Workflow
 
 
-DEFAULT_SYSTEM_PROMPT = """You are a molecular-simulation conversion agent.
-Use deterministic tools for all file inspection and conversion. Never invent scientific
-data. Call tools when evidence is needed. Report preservation, loss, warnings, and
-assumptions. Finish with a concise answer only after required validation is complete.
+DEFAULT_SYSTEM_PROMPT = """You are a scientific molecular-simulation orchestrator.
+Understand the user's scientific objective before selecting a workflow. Use trusted
+deterministic tools for parsing, simulation, analysis, conversion, and validation. Never
+invent scientific data or claim a calculation ran without a successful tool observation.
+Assess capability gaps explicitly and explain missing dependencies, data, implementation,
+or compute resources. Report units, assumptions, preservation/loss, warnings, and
+provenance. Finish with a concise answer only after required validation is complete.
 All paths are relative to the constrained workspace. Explain decisions and evidence
 briefly, but do not reveal private chain-of-thought. If a requested format is not in the
 implemented tool schema, say that it is not implemented here; never substitute a format."""
@@ -43,7 +50,7 @@ PROFILES = ("full", "compact", "auto")
 INTENT_MODES = ("deterministic", "llm")
 
 
-class Agent:
+class Agent(AgentRuntime):
     """Coordinates an LLM and deterministic tools without an agent framework."""
 
     def __init__(
@@ -63,6 +70,7 @@ class Agent:
         dry_run: bool = False,
         intent_mode: str = "deterministic",
     ) -> None:
+        super().__init__()
         if max_iterations < 1:
             raise ValueError("max_iterations must be positive")
         if backend is None:
@@ -91,6 +99,7 @@ class Agent:
         self.progress_level = progress_level or ("brief" if progress else "off")
         self.dry_run = dry_run
         self.intent_mode = intent_mode
+        self.workflow: Workflow = self.workflows[-1]
         if self.progress_level not in {"off", "brief", "detailed"}:
             raise ValueError("progress_level must be off, brief, or detailed")
 
@@ -108,6 +117,8 @@ class Agent:
                 inspection_tool_specs(self.workspace),
                 conversion_tool_specs(self.workspace),
                 validation_tool_specs(self.workspace),
+                analysis_tool_specs(self.workspace),
+                simulation_tool_specs(self.workspace),
             )
         for group in tool_groups:
             for tool in group:
@@ -134,10 +145,11 @@ class Agent:
             original_objective=objective,
             dry_run=self.dry_run,
         )
+        self.workflow = self.workflow_for(effective_objective)
         # Capability assessment is explicit state, not an assertion hidden in a prompt.
         # Conversion behavior remains unchanged; scientific requests get a conservative
         # preflight that can explain missing implementation/dependencies to the model.
-        if not self._is_conversion_objective(objective) and re.search(
+        if self.workflow.name != "conversion" and re.search(
             r"\b(?:trajectory|autocorrelation|vacf|rdf|msd|molecular dynamics|md|simulation|observable)\b",
             objective,
             re.IGNORECASE,
@@ -151,7 +163,7 @@ class Agent:
         if self.intent_mode == "deterministic":
             intent = (
                 self._compact_expected_arguments(state, "convert_structure")
-                if self.profile == "compact" and self._is_conversion_objective(objective)
+                if self.profile == "compact" and self.workflow.name == "conversion"
                 else {"objective": objective}
             )
             self._emit("intent_rewrite", {"status": "deterministic", "intent": intent})
@@ -367,12 +379,7 @@ class Agent:
     def _completion_blocker(self, state: AgentState) -> str | None:
         successful_tools = self._successful_tool_names(state)
         if self._is_conversion_objective(state.objective):
-            required_order = (
-                "detect_file_format",
-                "inspect_structure",
-                "convert_structure",
-                "validate_conversion",
-            )
+            required_order = ConversionWorkflow().completion_requirements
             for required in required_order:
                 if required not in successful_tools:
                     return (
@@ -403,12 +410,7 @@ class Agent:
         """Keep conversion tools in a deterministic scientific order."""
         if not self._is_conversion_objective(state.objective):
             return None
-        sequence = (
-            "detect_file_format",
-            "inspect_structure",
-            "convert_structure",
-            "validate_conversion",
-        )
+        sequence = ConversionWorkflow().completion_requirements
         successful = self._successful_tool_names(state)
         if tool_name == "convert_structure" and "inspect_structure" in successful:
             # Full-profile models may request several independent output formats
@@ -427,15 +429,7 @@ class Agent:
         if self.profile != "compact" or not self._is_conversion_objective(state.objective):
             return schemas
         successful_tools = self._successful_tool_names(state)
-        sequence = (
-            "detect_file_format",
-            "inspect_structure",
-            "convert_structure",
-            "validate_conversion",
-        )
-        next_tool = next(
-            (name for name in sequence if name not in successful_tools), None
-        )
+        next_tool = ConversionWorkflow().next_tool(successful_tools)
         if next_tool is None:
             return []
         selected = [
@@ -463,7 +457,8 @@ class Agent:
         return bool(
             re.search(
                 r"\b(?:file|files|directory|folder|workspace|structure|inspect|detect|"
-                r"read|find|list|validate|simulation|poscar|xyz|cif|lammps|traj)\b",
+                r"read|find|list|validate|simulation|trajectory|rdf|msd|autocorrelation|"
+                r"poscar|xyz|cif|lammps|traj)\b",
                 objective,
                 re.IGNORECASE,
             )
@@ -486,6 +481,7 @@ class Agent:
             "created_files": state.created_files,
             "modified_files": state.modified_files,
             "warnings": state.warnings,
+            "capability_assessments": state.capability_assessments,
         }
         state_message = Message(
             role="system",
@@ -495,13 +491,9 @@ class Agent:
             return [state.messages[0], state_message, *state.messages[1:]]
 
         successful = self._successful_tool_names(state)
-        sequence = (
-            "detect_file_format",
-            "inspect_structure",
-            "convert_structure",
-            "validate_conversion",
-        )
-        next_tool = next((name for name in sequence if name not in successful), None)
+        next_tool = (ConversionWorkflow().next_tool(successful)
+                     if self._is_conversion_objective(state.objective)
+                     else None)
         if not self._tool_relevant_objective(state.objective):
             next_tool = None
             directive = (

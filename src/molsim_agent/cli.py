@@ -26,7 +26,7 @@ from molsim_agent.llm.anthropic import AnthropicBackend
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="molsim-agent",
-        description="An educational molecular-simulation conversion agent",
+        description="A scientific molecular-simulation agent with deterministic tools",
     )
     parser.add_argument("--workspace", default=".", help="Allowed filesystem workspace")
     parser.add_argument(
@@ -230,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
         intent_mode=args.intent_mode,
     )
     print("Molecular Simulation Agent")
-    print("Hello! I’m ready to inspect, convert, and validate molecular-simulation files.")
+    print("Hello! I can plan scientific workflows, inspect trajectories, run validated calculations, and convert structure files when needed.")
     print(f"Model: {args.model}")
     print(f"Workspace: {workspace}")
     if args.dry_run:

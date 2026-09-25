@@ -26,6 +26,7 @@ from molsim_agent.formats.structures import read_structure
 from molsim_agent.potentials.registry import PotentialRegistry
 from molsim_agent.safety.policies import Workspace
 from molsim_agent.science.models import ExperimentRecord, MDSpec, OptimizationSpec, SinglePointSpec
+from molsim_agent.simulation.compare import compare_single_point
 from molsim_agent.tools.registry import ToolSpec
 
 
@@ -199,4 +200,7 @@ def simulation_tool_specs(workspace: Workspace) -> list[ToolSpec]:
         ToolSpec("run_md", "Run a bounded NVE or NVT molecular-dynamics protocol.",
                  {"type": "object", "properties": {"spec": spec_schema, "output_dir": {"type": "string"}}, "required": ["spec"], "additionalProperties": False},
                  lambda spec, output_dir=None: run_md(workspace, spec, output_dir), category="simulation", risk="compute", requirements=("ase",), compute_cost="cpu", deterministic=False),
+        ToolSpec("compare_single_point", "Evaluate identical fixed configurations with multiple calculators.",
+                 {"type": "object", "properties": {"structure": {"type": "string"}, "calculators": {"type": "array", "items": {"type": "string"}}}, "required": ["structure", "calculators"], "additionalProperties": False},
+                 lambda structure, calculators: compare_single_point(workspace, structure, calculators), category="analysis", risk="compute", requirements=("ase",), compute_cost="cpu", deterministic=True),
     ]

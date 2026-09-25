@@ -15,8 +15,15 @@ def assess_capability(task: str, tool_names: set[str]) -> CapabilityAssessment:
     reports unknown analyses as implementable gaps instead of pretending they exist.
     """
     lowered = task.lower()
-    known = {"single_point", "geometry_optimization", "run_md", "trajectory_summary", "rdf", "msd"}
-    matched = next((name for name in known if name in lowered), None)
+    aliases = {
+        "single_point": ("single point", "energy and forces"),
+        "geometry_optimization": ("geometry optimization", "optimize", "optimise"),
+        "run_md": ("molecular dynamics", " md ", "nve", "nvt"),
+        "trajectory_summary": ("trajectory summary", "summarize trajectory", "summarise trajectory"),
+        "rdf": ("rdf", "radial distribution"),
+        "msd": ("msd", "mean squared displacement"),
+    }
+    matched = next((name for name, words in aliases.items() if any(word in f" {lowered} " for word in words)), None)
     if matched and matched in tool_names:
         return CapabilityAssessment(CapabilityStatus.AVAILABLE, task)
     if any(word in lowered for word in ("correlation", "autocorrelation", "vacf", "residence time", "orientational")):
